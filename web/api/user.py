@@ -165,17 +165,18 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
                 async def _update_ui():
                     try:
                         await bot.edit_message_text(
-                            user_id, progress_msg.message_id, 
-                            f"📥 <b>Media serverga yuklanmoqda...</b>\n\n"
-                            f"📊 {pct:.1f}%\n"
-                            f"💾 {c_str} / {t_str}", 
+                            text=f"📥 <b>Media serverga yuklanmoqda...</b>\n\n"
+                                 f"📊 {pct:.1f}%\n"
+                                 f"💾 {c_str} / {t_str}",
+                            chat_id=user_id, 
+                            message_id=progress_msg.message_id,
                             parse_mode="HTML"
                         )
                     except Exception:
                         pass
                 asyncio.create_task(_update_ui())
 
-        await bot.edit_message_text(user_id, progress_msg.message_id, "📥 <b>Media serverga yuklanmoqda...</b>", parse_mode="HTML")
+        await bot.edit_message_text(text="📥 <b>Media serverga yuklanmoqda...</b>", chat_id=user_id, message_id=progress_msg.message_id, parse_mode="HTML")
         downloaded_path, media_type = await userbot.fetch_and_download(user_id, parsed, progress_callback=on_download_progress)
 
         # DB ga tarix yozish
@@ -188,7 +189,7 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
             ))
             await db.commit()
 
-        await bot.edit_message_text(user_id, progress_msg.message_id, "📤 <b>Sizga yuborilmoqda...</b>", parse_mode="HTML")
+        await bot.edit_message_text(text="📤 <b>Sizga yuborilmoqda...</b>", chat_id=user_id, message_id=progress_msg.message_id, parse_mode="HTML")
 
         from aiogram.types import FSInputFile
         from utils import MediaType
@@ -213,19 +214,18 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
         logger.info(f"✅ Web App yuklash: user={user_id}, fayl={downloaded_path.name}")
 
     except AccessDeniedError as e:
-        await bot.edit_message_text(user_id, progress_msg.message_id, f"🚫 Kirish taqiqlangan!\n{e}\n\nAkkauntingiz kanalga a'zo ekanligini tekshiring.")
+        await bot.edit_message_text(text=f"🚫 Kirish taqiqlangan!\n{e}\n\nAkkauntingiz kanalga a'zo ekanligini tekshiring.", chat_id=user_id, message_id=progress_msg.message_id)
     except MessageNotFoundError as e:
-        await bot.edit_message_text(user_id, progress_msg.message_id, f"❌ Xabar topilmadi: {e}")
+        await bot.edit_message_text(text=f"❌ Xabar topilmadi: {e}", chat_id=user_id, message_id=progress_msg.message_id)
     except NoMediaError:
-        await bot.edit_message_text(user_id, progress_msg.message_id, "⚠️ Bu xabarda yuklanadigan media yo'q.")
+        await bot.edit_message_text(text="⚠️ Bu xabarda yuklanadigan media yo'q.", chat_id=user_id, message_id=progress_msg.message_id)
     except UserbotError as e:
-        await bot.edit_message_text(user_id, progress_msg.message_id,
-            f"⚠️ Sessiyangiz ulanmagan!\n\nWeb App → Ulanish bo'limidan Telegram akkauntingizni ulang.", parse_mode="HTML")
+        await bot.edit_message_text(text=f"⚠️ Sessiyangiz ulanmagan!\n\nWeb App → Ulanish bo'limidan Telegram akkauntingizni ulang.", chat_id=user_id, message_id=progress_msg.message_id, parse_mode="HTML")
         logger.error(f"UserbotError: {e}")
     except Exception as e:
         logger.error(f"Web download xatolik: {e}", exc_info=True)
         try:
-            await bot.edit_message_text(user_id, progress_msg.message_id, f"❌ Kutilmagan xatolik: {e}")
+            await bot.edit_message_text(text=f"❌ Kutilmagan xatolik: {e}", chat_id=user_id, message_id=progress_msg.message_id)
         except Exception:
             pass
     finally:
