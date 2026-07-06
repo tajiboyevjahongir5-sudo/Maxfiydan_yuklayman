@@ -86,35 +86,66 @@
         #toast{position:fixed;bottom:2rem;right:2rem;background:#22c55e;color:#fff;padding:.75rem 1.25rem;border-radius:12px;font-size:.875rem;font-weight:600;opacity:0;transition:opacity .3s;z-index:999}
         #toast.show{opacity:1}
 
-        /* ── Section hide ── */
-        .section{display:none}.section.active{display:block}
+        /* ── Overlay & Mobile Header ── */
+        .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;opacity:0;pointer-events:none;transition:opacity .3s}
+        .overlay.active{opacity:1;pointer-events:auto}
+        .mobile-header{display:none;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:var(--sidebar);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30}
+        .mobile-header .brand-info{display:flex;align-items:center;gap:.6rem;font-weight:700}
+        .hamburger{background:transparent;border:none;color:var(--text);font-size:1.5rem;cursor:pointer}
+        .close-btn{display:none;background:transparent;border:none;color:var(--text);font-size:1.5rem;cursor:pointer;position:absolute;top:1rem;right:1rem}
+
+        /* ── Footer ── */
+        footer{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.85rem;margin-top:auto}
 
         @media(max-width:1100px){
             .stats{grid-template-columns:1fr 1fr}
         }
         @media(max-width:768px){
             body { flex-direction: column; }
-            aside {
-                width: 100vw; min-width: 100vw; height: 60px;
-                flex-direction: row; align-items: center; justify-content: flex-start;
-                padding: 0; border-right: none; border-bottom: 1px solid var(--border);
-                overflow-x: auto; overflow-y: hidden; white-space: nowrap; z-index: 50;
-                -webkit-overflow-scrolling: touch;
-            }
-            .brand { display: none; }
-            nav { display: flex; flex-direction: row; align-items: center; height: 100%; }
-            nav a { padding: 0 1.25rem; border-left: none; border-bottom: 3px solid transparent; height: 100%; display: flex; align-items: center; }
-            nav a.active { border-bottom-color: var(--primary); border-left-color: transparent; }
-            .logout-link { margin-top: 0; margin-left: auto; padding: 0 1rem; }
-            .logout-link button { width: auto !important; white-space: nowrap; }
+            .mobile-header { display: flex; }
             
+            /* Sidebar Drawer */
+            aside {
+                position: fixed; top: 0; left: -280px; width: 280px; min-width: 280px; height: 100vh;
+                flex-direction: column; align-items: stretch; justify-content: flex-start;
+                padding: 1.5rem 0; border-right: 1px solid var(--border); border-bottom: none;
+                overflow-x: hidden; overflow-y: auto; z-index: 50; transition: left .3s ease;
+            }
+            aside.open { left: 0; }
+            .brand { border-bottom: none; margin-bottom: 1rem; }
+            .close-btn { display: block; }
+            nav { flex-direction: column; height: auto; }
+            nav a { padding: 1rem 1.5rem; border-left: 3px solid transparent; border-bottom: none; font-size: 1rem; }
+            nav a.active { border-left-color: var(--primary); }
+            .logout-link { margin-top: auto; margin-left: 0; padding: 1.5rem; }
+            .logout-link button { width: 100% !important; padding: .8rem; font-size: 1rem; }
+            
+            /* Main Content */
             .form-row{grid-template-columns:1fr}
-            main{padding:1rem; padding-bottom: 2rem;}
-            .stats{grid-template-columns:1fr 1fr}
+            main{padding:1rem; display: flex; flex-direction: column; min-height: calc(100vh - 60px);}
+            .stats{grid-template-columns:1fr; gap: 0.75rem;}
+            .stat{padding: 1rem;}
+            .stat .val{font-size: 1.6rem;}
+            
+            /* Card List for Tables */
+            .tbl-wrap { overflow: visible; background: transparent; border: none; padding: 0; }
+            table, thead, tbody, th, td, tr { display: block; width: 100%; }
+            thead { display: none; }
+            tbody tr { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1rem; padding: 1rem; position: relative; }
+            tbody td { padding: .4rem 0; border: none; display: flex; flex-direction: column; font-size: .9rem; }
+            tbody td::before { content: attr(data-label); font-size: .75rem; color: var(--muted); text-transform: uppercase; font-weight: 600; margin-bottom: .2rem; }
+            tbody td:last-child { margin-top: .5rem; padding-top: .5rem; border-top: 1px solid rgba(255,255,255,.05); flex-direction: row; justify-content: flex-end; }
         }
     </style>
 </head>
 <body>
+
+<div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+
+<header class="mobile-header">
+    <div class="brand-info"><span>🤖</span> Media Bot</div>
+    <button class="hamburger" onclick="toggleMenu()">☰</button>
+</header>
 
 <!-- ══ LOGIN ════════════════════════════════════════════════════════════════ -->
 <div id="login">
@@ -129,18 +160,19 @@
 <style>@keyframes spin{100%{transform:rotate(360deg)}}</style>
 
 <!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
-<aside>
+<aside id="sidebar">
+    <button class="close-btn" onclick="toggleMenu()">✕</button>
     <div class="brand">
         <span>🤖</span><span>Media Bot</span>
     </div>
     <nav>
-        <a class="active" onclick="go('dashboard')">📊 <span>Dashboard</span></a>
-        <a onclick="go('users')">👥 <span>Foydalanuvchilar</span></a>
-        <a onclick="go('logs')">📋 <span>So'rovlar</span></a>
-        <a onclick="go('sessions')">🔑 <span>Sessiyalar</span></a>
-        <a onclick="go('tariffs')">💳 <span>Tariflar</span></a>
-        <a onclick="go('broadcast')">📢 <span>Xabar yuborish</span></a>
-        <a onclick="go('settings')">⚙️ <span>Sozlamalar</span></a>
+        <a class="active" onclick="go('dashboard'); if(window.innerWidth<=768)toggleMenu()">📊 <span>Dashboard</span></a>
+        <a onclick="go('users'); if(window.innerWidth<=768)toggleMenu()">👥 <span>Foydalanuvchilar</span></a>
+        <a onclick="go('logs'); if(window.innerWidth<=768)toggleMenu()">📋 <span>So'rovlar</span></a>
+        <a onclick="go('sessions'); if(window.innerWidth<=768)toggleMenu()">🔑 <span>Sessiyalar</span></a>
+        <a onclick="go('tariffs'); if(window.innerWidth<=768)toggleMenu()">💳 <span>Tariflar</span></a>
+        <a onclick="go('broadcast'); if(window.innerWidth<=768)toggleMenu()">📢 <span>Xabar yuborish</span></a>
+        <a onclick="go('settings'); if(window.innerWidth<=768)toggleMenu()">⚙️ <span>Sozlamalar</span></a>
     </nav>
     <div class="logout-link">
         <button class="btn btn-outline" style="width:100%;font-size:.8rem" onclick="logout()">🚪 Chiqish</button>
@@ -299,6 +331,8 @@
         </div>
     </div>
 
+    <footer>@maxfiydan_yuklayman_bot</footer>
+
 </main>
 
 <div id="toast">✅ Muvaffaqiyatli!</div>
@@ -388,6 +422,7 @@ function go(name) {
     document.getElementById(`s-${name}`).classList.add('active');
     event.currentTarget.classList.add('active');
     loadSection(name);
+    if(window.innerWidth <= 768) toggleMenu();
 }
 
 function loadSection(name) {
@@ -436,14 +471,14 @@ async function loadUsers() {
     const users = Object.entries(data).map(([id, u]) => ({ id, ...u }));
     tbody.innerHTML = users.length ? users.map(u => `
         <tr>
-            <td><code style="font-size:.8rem;color:#94a3b8">${u.id}</code></td>
-            <td>${u.name || '—'}</td>
-            <td>—</td>
-            <td>${u.requests ?? 0}</td>
-            <td>${u.banned
+            <td data-label="ID"><code style="font-size:.8rem;color:#94a3b8">${u.id}</code></td>
+            <td data-label="Ism">${u.name || '—'}</td>
+            <td data-label="Username">—</td>
+            <td data-label="So'rovlar">${u.requests ?? 0}</td>
+            <td data-label="Holat">${u.banned
                 ? '<span class="badge badge-red">Bloklangan</span>'
                 : '<span class="badge badge-green">Faol</span>'}</td>
-            <td>
+            <td data-label="Amal">
                 <button class="btn btn-sm ${u.banned ? 'btn-primary' : 'btn-danger'}"
                     onclick="toggleBan('${u.id}', this)">
                     ${u.banned ? 'Qulfdan chiq.' : 'Bloklash'}
@@ -465,15 +500,15 @@ async function loadLogs() {
     if (!logs) return;
     tbody.innerHTML = logs.length ? logs.map(l => `
         <tr>
-            <td style="white-space:nowrap;color:var(--muted);font-size:.8rem">${
+            <td data-label="Vaqt" style="white-space:nowrap;color:var(--muted);font-size:.8rem">${
                 l.time ? new Date(l.time * 1000).toLocaleString('uz-UZ') : '—'
             }</td>
-            <td>${l.user_name || l.user_id || '—'}</td>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.link||''}">${l.link || '—'}</td>
-            <td>${l.status === 'success'
+            <td data-label="Foydalanuvchi">${l.user_name || l.user_id || '—'}</td>
+            <td data-label="Havola" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.link||''}">${l.link || '—'}</td>
+            <td data-label="Status">${l.status === 'success'
                 ? '<span class="badge badge-green">OK</span>'
                 : '<span class="badge badge-red">Xato</span>'}</td>
-            <td style="color:var(--danger);font-size:.8rem">${l.error_msg || ''}</td>
+            <td data-label="Xato matni" style="color:var(--danger);font-size:.8rem">${l.error_msg || ''}</td>
         </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Tarix bo'sh</td></tr>`;
 }
 
@@ -484,20 +519,20 @@ async function loadSessions() {
     if (!sessions) return;
     tbody.innerHTML = sessions.length ? sessions.map(s => `
         <tr>
-            <td>${s.id}</td>
-            <td><code style="font-size:.8rem;color:#94a3b8">${s.user_id}</code></td>
-            <td>${s.phone_number}</td>
-            <td>${s.is_active
+            <td data-label="ID">${s.id}</td>
+            <td data-label="Foydalanuvchi ID"><code style="font-size:.8rem;color:#94a3b8">${s.user_id}</code></td>
+            <td data-label="Telefon">${s.phone_number}</td>
+            <td data-label="Holat">${s.is_active
                 ? '<span class="badge badge-green">Faol</span>'
                 : '<span class="badge badge-red">Nofaol</span>'}</td>
-            <td>
+            <td data-label="Yashirin Rejim">
                 <button class="btn btn-sm ${s.stealth_mode ? 'btn-danger' : 'btn-outline'}" 
                         style="display:flex;align-items:center;gap:4px"
                         onclick="toggleStealth(${s.user_id}, this)">
                     🥷 ${s.stealth_mode ? 'O\'chirish' : 'Yoqish'}
                 </button>
             </td>
-            <td>
+            <td data-label="Amal">
                 <button class="btn btn-sm btn-danger" onclick="deleteSession(${s.id})">O'chirish</button>
             </td>
         </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Sessiyalar yo'q</td></tr>`;
