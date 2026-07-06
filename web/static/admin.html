@@ -95,20 +95,22 @@
         @media(max-width:768px){
             body { flex-direction: column; }
             aside {
-                width: 100%; min-width: 100%; height: auto;
-                flex-direction: row; align-items: center;
+                width: 100vw; min-width: 100vw; height: 60px;
+                flex-direction: row; align-items: center; justify-content: flex-start;
                 padding: 0; border-right: none; border-bottom: 1px solid var(--border);
-                overflow-x: auto; white-space: nowrap; z-index: 50;
+                overflow-x: auto; overflow-y: hidden; white-space: nowrap; z-index: 50;
+                -webkit-overflow-scrolling: touch;
             }
-            .brand { border-bottom: none; border-right: 1px solid var(--border); padding: 1rem; margin-right: 0.5rem; }
-            nav { display: flex; flex-direction: row; align-items: center; }
-            nav a { padding: 1rem; border-left: none; border-bottom: 3px solid transparent; }
+            .brand { display: none; }
+            nav { display: flex; flex-direction: row; align-items: center; height: 100%; }
+            nav a { padding: 0 1.25rem; border-left: none; border-bottom: 3px solid transparent; height: 100%; display: flex; align-items: center; }
             nav a.active { border-bottom-color: var(--primary); border-left-color: transparent; }
-            .logout-link { margin-top: 0; margin-left: auto; padding: 1rem; }
+            .logout-link { margin-top: 0; margin-left: auto; padding: 0 1rem; }
+            .logout-link button { width: auto !important; white-space: nowrap; }
             
             .form-row{grid-template-columns:1fr}
-            main{padding:1rem}
-            .stats{grid-template-columns:1fr}
+            main{padding:1rem; padding-bottom: 2rem;}
+            .stats{grid-template-columns:1fr 1fr}
         }
     </style>
 </head>
