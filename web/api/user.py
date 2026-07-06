@@ -105,3 +105,23 @@ async def get_my_history(user_id: int = Depends(get_current_user_id)):
                 created_at=h.created_at
             ) for h in history
         ]
+
+class UserSettings(BaseModel):
+    autoCompress: bool
+    saveToSaved: bool
+
+@router.post("/settings")
+async def update_my_settings(settings: UserSettings, user_id: int = Depends(get_current_user_id)):
+    """User Dashboard orqali sozlamalarni saqlaydi."""
+    async with async_session() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        user.auto_compress = settings.autoCompress
+        user.save_to_saved_messages = settings.saveToSaved
+        await db.commit()
+        
+        return {"status": "success"}
