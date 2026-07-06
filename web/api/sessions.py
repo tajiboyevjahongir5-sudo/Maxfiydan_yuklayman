@@ -127,3 +127,16 @@ async def verify_2fa(req: PasswordRequest, user_id: int = Depends(get_current_us
         return {"status": "success", "message": "Akkaunt 2FA orqali muvaffaqiyatli ulandi!"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/status")
+async def check_session_status(user_id: int = Depends(get_current_user_id)):
+    """Userning aktiv sessiyasi borligini tekshiradi."""
+    from sqlalchemy import select
+    async with async_session() as db:
+        result = await db.execute(select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True))
+        session = result.scalar_one_or_none()
+        
+        if session:
+            return {"is_active": True, "phone_number": session.phone_number}
+        else:
+            return {"is_active": False}

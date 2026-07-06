@@ -372,8 +372,19 @@ createApp({
         // JWT tokenini localStorage dan yuklab olish
         this.token = localStorage.getItem('jwt_token');
 
-        // Agar token yo'q bo'lsa va Telegram WebApp initData mavjud bo'lsa — avtomatik login
         if (!this.token && this.tg?.initData) {
+            await this.autoLogin();
+        }
+
+        if (this.token) {
+            await this.loadProfile();
+            // Sessiya faolligini tekshirish
+            await this.checkSession();
+        }
+        await this.loadTariffs();
+    },
+    methods: {
+        async autoLogin() {
             try {
                 const res = await fetch('/api/auth/telegram', {
                     method: 'POST',
@@ -386,16 +397,7 @@ createApp({
                     localStorage.setItem('jwt_token', this.token);
                 }
             } catch {}
-        }
-
-        if (this.token) {
-            await this.loadProfile();
-            // Sessiya faolligini tekshirish
-            await this.checkSession();
-        }
-        await this.loadTariffs();
-    },
-    methods: {
+        },
         // ── Profil ──────────────────────────────────────────────
         async loadProfile() {
             try {
@@ -409,10 +411,17 @@ createApp({
                     this.settings.autoCompress = this.profile.auto_compress;
                     this.settings.saveToSaved = this.profile.save_to_saved_messages;
                     await this.loadHistory();
-                } else if (res.status === 401) {
-                    // Token eskirgan, tozalab qayta login qilish
+                } else if (res.status === 401 || res.status === 404) {
+                    // Token eskirgan yoki user topilmadi, tozalab qayta login qilish
                     localStorage.removeItem('jwt_token');
                     this.token = null;
+                    if (this.tg?.initData) {
+                        await this.autoLogin();
+                        if (this.token) {
+                            await this.loadProfile();
+                            await this.checkSession();
+                        }
+                    }
                 }
             } catch {}
         },
