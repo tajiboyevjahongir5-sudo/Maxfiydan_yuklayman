@@ -317,7 +317,7 @@ class UserbotClient:
 
         logger.info(
             f"⬇️  Media yuklanmoqda: "
-            f"{human_readable_size(file_size) if file_size else 'noma\\'lum hajm'} → "
+            f"{human_readable_size(file_size) if file_size else 'noma lum hajm'} → "
             f"{dest_path}"
         )
 
