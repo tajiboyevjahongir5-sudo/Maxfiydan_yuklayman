@@ -19,13 +19,17 @@ import os
 import signal
 import sys
 
-# ─── MUHIM: Python 3.10+ + Pyrogram moslik tuzatishi ────────────────────────
-# Pyrogram import vaqtida asyncio.get_event_loop() chaqiradi.
-# Python 3.10+ da event loop oldindan bo'lmasa RuntimeError beradi.
-# Shuning uchun barcha import lardan OLDIN event loop yaratib qo'yamiz.
+# ─── MUHIM: uvloop + Python 3.10+ + Pyrogram moslik tuzatishi ───────────────
+# Pyrogram's sync.py import vaqtida asyncio.get_event_loop() chaqiradi.
+# Railway da uvloop o'rnatilgan bo'lib, u get_event_loop() ni override qiladi.
+# uvloop policy o'rnatib, loop yaratib, set qilsak — Pyrogram uni topadi.
 try:
-    asyncio.get_event_loop()
-except RuntimeError:
+    import uvloop
+    uvloop.install()                          # uvloop ni policy sifatida o'rnatish
+    _loop = uvloop.new_event_loop()           # uvloop loop yaratish
+    asyncio.set_event_loop(_loop)             # uni joriy thread loop sifatida belgilash
+except ImportError:
+    # uvloop yo'q bo'lsa (masalan, Windows), oddiy asyncio loop ishlatiladi
     _loop = asyncio.new_event_loop()
     asyncio.set_event_loop(_loop)
 # ─────────────────────────────────────────────────────────────────────────────
