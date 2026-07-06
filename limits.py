@@ -54,9 +54,9 @@ async def check_download_limits(user_id: int) -> None:
                 raise LimitExceededError(f"Sizning tarifingiz hajmi ({max_gb:.1f} GB) tugadi. Yangi tarif xarid qiling.")
         else:
             # Boshlang'ich (tekin) tarif qoidalari
-            # 500 MB limit, 3 kun, kuniga 3 ta
+            # 500 MB limit, 3 kun, jami 3 ta yuklash
             max_bytes = 500 * 1024 * 1024
-            max_daily = 3
+            max_total_downloads = 3
             days_allowed = 3
 
             # 1. Muddat
@@ -67,6 +67,7 @@ async def check_download_limits(user_id: int) -> None:
             if used_bytes >= max_bytes:
                 raise LimitExceededError("Siz 500 MB lik tekin limitni ishlatib bo'ldingiz. Yangi tarif xarid qiling.")
             
-            # 3. Kunlik yuklama
-            if today_count >= max_daily:
-                raise LimitExceededError(f"Tekin tarifda kuniga faqat {max_daily} ta fayl yuklash mumkin. Bugungi limit tugadi.")
+            # 3. Jami yuklama soni
+            total_downloads_count = len(downloads)
+            if total_downloads_count >= max_total_downloads:
+                raise LimitExceededError(f"Tekin tarifda jami {max_total_downloads} ta fayl yuklash mumkin xolos. Limit tugadi.")
