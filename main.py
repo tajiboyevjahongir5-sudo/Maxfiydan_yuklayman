@@ -20,15 +20,16 @@ import signal
 import sys
 
 import uvicorn
-from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
+from aiogram import Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import config
 from handlers import router
+from payment_handler import payment_router
 from userbot import userbot
 from web.app import app as web_app
+from bot_instance import bot
 
 logger = logging.getLogger(__name__)
 
@@ -110,20 +111,13 @@ def _setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
 async def main() -> None:
     """Botning asosiy asinxron tsikli."""
 
-    # Aiogram Bot ob'ekti
-    bot = Bot(
-        token=config.bot.token,
-        default=DefaultBotProperties(
-            parse_mode=ParseMode.HTML,  # Barcha xabarlarda HTML parse
-        ),
-    )
-
     # Dispatcher — FSM uchun MemoryStorage (oddiy botlar uchun yetarli)
     # Katta yuklamali production uchun RedisStorage tavsiya etiladi
     dp = Dispatcher(storage=MemoryStorage())
 
     # Handlerlari ro'yxatdan o'tkazish
     dp.include_router(router)
+    dp.include_router(payment_router)
 
     # Hayot tsikli hooklari
     dp.startup.register(on_startup)
@@ -147,7 +141,7 @@ async def main() -> None:
         # Polling boshlash
         await dp.start_polling(
             bot,
-            allowed_updates=["message", "callback_query"],
+            allowed_updates=["message", "callback_query", "channel_post"],
         )
     except Exception as e:
         logger.critical(f"💥 Polling da kritik xato: {e}", exc_info=True)

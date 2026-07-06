@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import BigInteger, String, Boolean, Integer, DateTime, ForeignKey, Float
+from sqlalchemy import BigInteger, String, Boolean, Integer, DateTime, ForeignKey, Float, Text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from config import config
@@ -92,15 +92,18 @@ class UserTariff(Base):
 
 
 class Payment(Base):
-    """To'lovlar tarixi (Click/Payme)."""
+    """To'lovlar tarixi."""
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
-    provider: Mapped[str] = mapped_column(String, nullable=False) # 'click', 'payme'
-    status: Mapped[str] = mapped_column(String, default="pending") # pending, completed, failed
+    tariff_id: Mapped[int] = mapped_column(Integer, ForeignKey("tariffs.id", ondelete="CASCADE"))
+    amount: Mapped[float] = mapped_column(Float, nullable=False)        # Asl narx
+    unique_amount: Mapped[int] = mapped_column(Integer, nullable=False)  # Narx + tasodifiy 1-100
+    provider: Mapped[str] = mapped_column(String, nullable=False)        # 'card'
+    status: Mapped[str] = mapped_column(String, default="pending")       # pending, completed, failed, expired
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 2 daqiqadan keyin
 
     user: Mapped["User"] = relationship(back_populates="payments")
 
@@ -118,8 +121,27 @@ class DownloadHistory(Base):
     user: Mapped["User"] = relationship(back_populates="downloads")
 
 
+class BotSettings(Base):
+    """Bot uchun sozlamalar (karta ma'lumoti, to'lov kanali)."""
+    __tablename__ = "bot_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)  # Bitta qator
+    card_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    card_holder: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    bank_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    payment_channel_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+
+
 # ─── Init DB Function ───────────────────────────────────────────────────────
 async def init_db():
     """Barcha jadvallarni yaratadi."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+async def get_settings() -> Optional["BotSettings"]:
+    """Bot sozlamalarini bazadan oladi."""
+    async with async_session() as db:
+        result = await db.execute(
+            __import__("sqlalchemy", fromlist=["select"]).select(BotSettings).where(BotSettings.id == 1)
+        )
+        return result.scalar_one_or_none()

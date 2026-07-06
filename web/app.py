@@ -9,6 +9,8 @@ from web.storage import get_stats, get_logs, get_users, toggle_ban_user
 from web.api.sessions import router as sessions_router
 from web.api.auth import router as auth_router
 from web.api.billing import router as billing_router
+from web.api.user import router as user_router
+from web.api.admin import router as admin_router
 
 app = FastAPI(title="Telegram Media Bot SaaS")
 
@@ -16,6 +18,8 @@ app = FastAPI(title="Telegram Media Bot SaaS")
 app.include_router(sessions_router)
 app.include_router(auth_router)
 app.include_router(billing_router)
+app.include_router(user_router)
+app.include_router(admin_router)
 
 # Mount static files
 static_dir = os.path.join(os.path.dirname(__file__), "static")

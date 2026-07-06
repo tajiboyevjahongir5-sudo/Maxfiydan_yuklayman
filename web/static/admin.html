@@ -3,127 +3,531 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Media Bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Admin Panel — Maxfiy Media Bot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        :root{
+            --bg:#0b1120;--sidebar:#111827;--card:rgba(17,24,39,.8);
+            --border:rgba(255,255,255,.07);--primary:#3b82f6;--danger:#ef4444;
+            --success:#22c55e;--warn:#f59e0b;--text:#f1f5f9;--muted:#64748b;
+        }
+        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+
+        /* ── Login ── */
+        #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+        .login-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2.5rem;width:340px;text-align:center}
+        .login-box h1{font-size:1.5rem;font-weight:700;margin-bottom:.5rem}
+        .login-box p{color:var(--muted);font-size:.875rem;margin-bottom:2rem}
+        
+        /* ── Sidebar ── */
+        aside{width:220px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:1.5rem 0;position:fixed;height:100vh;top:0;left:0}
+        .brand{padding:0 1.5rem 1.5rem;font-size:1rem;font-weight:700;display:flex;align-items:center;gap:.6rem;border-bottom:1px solid var(--border)}
+        nav a{display:flex;align-items:center;gap:.75rem;padding:.7rem 1.5rem;font-size:.875rem;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;border-left:3px solid transparent}
+        nav a:hover{color:var(--text);background:rgba(255,255,255,.04)}
+        nav a.active{color:var(--primary);background:rgba(59,130,246,.08);border-left-color:var(--primary)}
+        .logout-link{margin-top:auto;padding:0 1.5rem 1rem}
+        
+        /* ── Main ── */
+        main{margin-left:220px;flex:1;padding:2rem;min-height:100vh}
+        h2{font-size:1.4rem;font-weight:700;margin-bottom:1.5rem}
+        h3{font-size:1rem;font-weight:600;margin-bottom:1rem}
+        
+        /* ── Cards ── */
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:1.5rem}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+        .stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem}
+        .stat .val{font-size:2rem;font-weight:700;margin-top:.25rem}
+        .stat .lbl{font-size:.8rem;color:var(--muted)}
+        
+        /* ── Tables ── */
+        .tbl-wrap{overflow-x:auto}
+        table{width:100%;border-collapse:collapse;font-size:.85rem}
+        thead th{text-align:left;padding:.6rem 1rem;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)}
+        tbody td{padding:.65rem 1rem;border-bottom:1px solid rgba(255,255,255,.04)}
+        tbody tr:hover{background:rgba(255,255,255,.025)}
+        
+        /* ── Forms ── */
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+        .form-row.one{grid-template-columns:1fr}
+        label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.4rem}
+        input,select,textarea{width:100%;background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.6rem .9rem;color:var(--text);font-size:.875rem;outline:none;font-family:'Inter',sans-serif}
+        input:focus,select:focus,textarea:focus{border-color:var(--primary)}
+        textarea{resize:vertical;min-height:80px}
+        
+        /* ── Buttons ── */
+        .btn{padding:.55rem 1.2rem;border:none;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .15s}
+        .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{opacity:.88}
+        .btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{opacity:.88}
+        .btn-sm{padding:.35rem .8rem;font-size:.8rem}
+        .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{background:rgba(255,255,255,.06)}
+        
+        /* ── Badge ── */
+        .badge{display:inline-block;padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600}
+        .badge-green{background:rgba(34,197,94,.15);color:#22c55e}
+        .badge-red{background:rgba(239,68,68,.15);color:#ef4444}
+        .badge-yellow{background:rgba(245,158,11,.15);color:#f59e0b}
+        
+        /* ── Toast ── */
+        #toast{position:fixed;bottom:2rem;right:2rem;background:#22c55e;color:#fff;padding:.75rem 1.25rem;border-radius:12px;font-size:.875rem;font-weight:600;opacity:0;transition:opacity .3s;z-index:999}
+        #toast.show{opacity:1}
+
+        /* ── Section hide ── */
+        .section{display:none}.section.active{display:block}
+
+        @media(max-width:900px){
+            aside{width:60px}.brand span{display:none}
+            nav a span{display:none}nav a{justify-content:center;padding:.7rem}
+            main{margin-left:60px}
+            .stats{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}
+        }
+    </style>
 </head>
 <body>
 
-    <!-- Login Screen -->
-    <div id="login-screen">
-        <div class="login-card glass">
-            <h2>Admin Panel</h2>
-            <div class="input-group">
-                <label>Admin Maxfiy Kaliti (Parol)</label>
-                <input type="password" id="password" placeholder="Maxfiy kalitni kiriting...">
-            </div>
-            <button id="login-btn">Kirish</button>
+<!-- ══ LOGIN ════════════════════════════════════════════════════════════════ -->
+<div id="login">
+    <div class="login-box">
+        <h1>🔐 Admin Panel</h1>
+        <p>Maxfiy kalitni (ADMIN_SECRET) kiriting</p>
+        <div style="margin-bottom:1rem">
+            <input type="password" id="pw" placeholder="Maxfiy kalit..." onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-primary" style="width:100%;padding:.75rem" onclick="doLogin()">Kirish</button>
+        <p id="login-err" style="color:#ef4444;font-size:.8rem;margin-top:.75rem;display:none">Noto'g'ri kalit!</p>
+    </div>
+</div>
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
+<aside>
+    <div class="brand">
+        <span>🤖</span><span>Media Bot</span>
+    </div>
+    <nav>
+        <a class="active" onclick="go('dashboard')">📊 <span>Dashboard</span></a>
+        <a onclick="go('users')">👥 <span>Foydalanuvchilar</span></a>
+        <a onclick="go('logs')">📋 <span>So'rovlar</span></a>
+        <a onclick="go('sessions')">🔑 <span>Sessiyalar</span></a>
+        <a onclick="go('tariffs')">💳 <span>Tariflar</span></a>
+        <a onclick="go('broadcast')">📢 <span>Xabar yuborish</span></a>
+        <a onclick="go('settings')">⚙️ <span>Sozlamalar</span></a>
+    </nav>
+    <div class="logout-link">
+        <button class="btn btn-outline" style="width:100%;font-size:.8rem" onclick="logout()">🚪 Chiqish</button>
+    </div>
+</aside>
+
+<!-- ══ MAIN ══════════════════════════════════════════════════════════════════ -->
+<main>
+
+    <!-- DASHBOARD -->
+    <div id="s-dashboard" class="section active">
+        <h2>Dashboard</h2>
+        <div class="stats">
+            <div class="stat"><div class="lbl">Jami So'rovlar</div><div class="val" id="st-total">—</div></div>
+            <div class="stat"><div class="lbl">Muvaffaqiyatli</div><div class="val" id="st-ok" style="color:var(--success)">—</div></div>
+            <div class="stat"><div class="lbl">Xatolar</div><div class="val" id="st-err" style="color:var(--danger)">—</div></div>
+            <div class="stat"><div class="lbl">Faol Foydalanuvchilar</div><div class="val" id="st-active">—</div></div>
         </div>
     </div>
 
-    <!-- App Container -->
-    <div id="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <h3>🤖 Media Bot</h3>
-            <ul class="nav-links">
-                <li class="active" data-target="dashboard">📊 Dashboard</li>
-                <li data-target="users">👥 Foydalanuvchilar</li>
-                <li data-target="logs">📋 So'rovlar Tarixi</li>
-                <li data-target="settings">⚙️ Sozlamalar</li>
-                <li id="logout-btn" style="color: var(--danger); margin-top: auto;">🚪 Chiqish</li>
-            </ul>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            
-            <!-- Dashboard View -->
-            <section id="dashboard" class="view active">
-                <h2>Dashboard</h2>
-                <div class="stats-grid">
-                    <div class="stat-card glass">
-                        <h4>Jami So'rovlar</h4>
-                        <div class="value" id="total-req">0</div>
-                    </div>
-                    <div class="stat-card glass">
-                        <h4>Muvaffaqiyatli</h4>
-                        <div class="value" style="color: var(--success)" id="success-req">0</div>
-                    </div>
-                    <div class="stat-card glass">
-                        <h4>Xatolar</h4>
-                        <div class="value" style="color: var(--danger)" id="error-req">0</div>
-                    </div>
-                    <div class="stat-card glass">
-                        <h4>Faol Foydalanuvchilar</h4>
-                        <div class="value" id="active-users">0</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Users View -->
-            <section id="users" class="view">
-                <h2>Foydalanuvchilar</h2>
-                <div class="glass table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Ism</th>
-                                <th>So'rovlar</th>
-                                <th>Oxirgi Faollik</th>
-                                <th>Amal</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-table">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Logs View -->
-            <section id="logs" class="view">
-                <h2>So'rovlar Tarixi (Oxirgi 200)</h2>
-                <div class="glass table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Vaqt</th>
-                                <th>Foydalanuvchi</th>
-                                <th>Havola</th>
-                                <th>Status</th>
-                                <th>Xatolik Matni</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logs-table">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Settings View -->
-            <section id="settings" class="view">
-                <h2>Bot Sozlamalari (.env)</h2>
-                <div class="glass" style="padding: 2rem;">
-                    <p style="margin-bottom: 1rem; color: var(--tg-theme-hint-color);">Sozlamalarni o'zgartirish uchun serverdagi .env faylini tahrirlab, botni qayta ishga tushiring.</p>
-                    
-                    <div style="margin-bottom: 1rem;">
-                        <strong>Maksimal fayl hajmi (MB):</strong> <span id="set-max-size">-</span>
-                    </div>
-                    <div style="margin-bottom: 1rem;">
-                        <strong>Yuklamalar papkasi:</strong> <span id="set-dl-dir">-</span>
-                    </div>
-                    <div style="margin-bottom: 1rem;">
-                        <strong>Ruxsatli foydalanuvchilar ID (ALLOW_USERS):</strong> <br>
-                        <code id="set-allowed" style="background: rgba(0,0,0,0.2); padding: 0.5rem; display: block; border-radius: 4px; margin-top: 0.5rem;">-</code>
-                    </div>
-                </div>
-            </section>
-
-        </main>
+    <!-- USERS -->
+    <div id="s-users" class="section">
+        <h2>Foydalanuvchilar</h2>
+        <div class="card">
+            <div class="tbl-wrap">
+                <table>
+                    <thead><tr><th>ID</th><th>Ism</th><th>Username</th><th>So'rovlar</th><th>Holat</th><th>Amal</th></tr></thead>
+                    <tbody id="users-body"><tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Yuklanmoqda...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <script src="/static/app.js"></script>
+    <!-- LOGS -->
+    <div id="s-logs" class="section">
+        <h2>So'rovlar Tarixi</h2>
+        <div class="card">
+            <div class="tbl-wrap">
+                <table>
+                    <thead><tr><th>Vaqt</th><th>Foydalanuvchi</th><th>Havola</th><th>Status</th><th>Xato matni</th></tr></thead>
+                    <tbody id="logs-body"><tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Yuklanmoqda...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SESSIONS -->
+    <div id="s-sessions" class="section">
+        <h2>Userbot Sessiyalar</h2>
+        <div class="card" style="margin-bottom:1.5rem">
+            <h3>Ulangan Sessiyalar</h3>
+            <div class="tbl-wrap">
+                <table>
+                    <thead><tr><th>ID</th><th>Foydalanuvchi ID</th><th>Telefon</th><th>Holat</th><th>Amal</th></tr></thead>
+                    <tbody id="sessions-body"><tr><td colspan="5" style="text-align:center;padding:1.5rem;color:var(--muted)">Yuklanmoqda...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TARIFFS -->
+    <div id="s-tariffs" class="section">
+        <h2>Tariflarni Boshqarish</h2>
+
+        <!-- Yangi tarif qo'shish -->
+        <div class="card">
+            <h3>Yangi Tarif Qo'shish</h3>
+            <div class="form-row">
+                <div><label>Tarif nomi</label><input id="t-name" placeholder="Pro"></div>
+                <div><label>Narxi (so'm)</label><input id="t-price" type="number" placeholder="25000"></div>
+            </div>
+            <div class="form-row">
+                <div><label>Max fayl hajmi (GB)</label><input id="t-gb" type="number" step="0.1" placeholder="10"></div>
+                <div><label>Muddat (kun)</label><input id="t-days" type="number" placeholder="30"></div>
+            </div>
+            <div class="form-row">
+                <div><label>Kunlik limit (-1 = cheksiz)</label><input id="t-dlimit" type="number" placeholder="-1"></div>
+                <div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="addTariff()">+ Qo'shish</button></div>
+            </div>
+        </div>
+
+        <!-- Tariflar jadval -->
+        <div class="card">
+            <h3>Mavjud Tariflar</h3>
+            <div class="tbl-wrap">
+                <table>
+                    <thead><tr><th>ID</th><th>Nomi</th><th>Narxi</th><th>Hajmi</th><th>Muddat</th><th>Limit/kun</th><th>Amal</th></tr></thead>
+                    <tbody id="tariffs-body"><tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--muted)">Yuklanmoqda...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- BROADCAST -->
+    <div id="s-broadcast" class="section">
+        <h2>Ommaviy Xabar Yuborish</h2>
+        <div class="card" style="max-width:600px">
+            <h3>Barcha foydalanuvchilarga xabar</h3>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">HTML formatida yozing: &lt;b&gt;, &lt;i&gt;, &lt;a href=''&gt; va boshqalar.</p>
+            <div style="margin-bottom:1rem">
+                <label>Xabar matni</label>
+                <textarea id="bc-text" rows="5" placeholder="Assalomu alaykum! 🎉&#10;Yangi xususiyat qo'shildi..."></textarea>
+            </div>
+            <div style="background:#1e293b;border-radius:12px;padding:1rem;margin-bottom:1rem">
+                <p style="font-size:.8rem;color:var(--muted);margin-bottom:.5rem">Ko'rinish:</p>
+                <div id="bc-preview" style="font-size:.9rem;line-height:1.6">—</div>
+            </div>
+            <button class="btn btn-primary" onclick="sendBroadcast()">📢 Yuborish</button>
+        </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="s-settings" class="section">
+        <h2>Bot Sozlamalari</h2>
+
+        <div class="card" style="max-width:600px">
+            <h3>💳 Karta Ma'lumotlari</h3>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:1.25rem">Foydalanuvchilar to'lov qilganda shu karta ko'rinadi.</p>
+
+            <div class="form-row">
+                <div>
+                    <label>Karta Raqami</label>
+                    <input id="s-card-num" placeholder="8600 1234 5678 9012">
+                </div>
+                <div>
+                    <label>Karta Egasi (Ism Familiya)</label>
+                    <input id="s-card-holder" placeholder="ALISHER UMAROV">
+                </div>
+            </div>
+            <div class="form-row one">
+                <div>
+                    <label>Bank Nomi</label>
+                    <input id="s-bank" placeholder="Uzum Bank">
+                </div>
+            </div>
+
+            <div style="height:1px;background:rgba(255,255,255,.07);margin:1.5rem 0"></div>
+
+            <h3>📢 To'lov Kanali</h3>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">
+                Foydalanuvchilar to'lov chekini shu kanalga yuborishadi. Bot xabarlarni o'qib to'lovni tasdiqlaydi.<br>
+                <span style="color:var(--warn)">⚠ Bot shu kanalga <b>admin</b> sifatida qo'shilgan bo'lishi shart.</span>
+            </p>
+
+            <div class="form-row one">
+                <div>
+                    <label>Kanal ID (masalan: -1001234567890)</label>
+                    <input id="s-channel-id" type="number" placeholder="-1001234567890">
+                </div>
+            </div>
+
+            <div style="margin-top:1.5rem;display:flex;gap:.75rem">
+                <button class="btn btn-primary" onclick="saveSettings()">💾 Saqlash</button>
+                <button class="btn btn-outline" onclick="loadSettings()">↺ Qayta yuklash</button>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<div id="toast">✅ Muvaffaqiyatli!</div>
+
+<script>
+let TOKEN = null;
+
+// ── Login ──────────────────────────────────────────────────────────────────
+async function doLogin() {
+    const pw = document.getElementById('pw').value;
+    const res = await fetch('/token', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:`username=admin&password=${encodeURIComponent(pw)}`
+    });
+    if (res.ok) {
+        TOKEN = (await res.json()).access_token;
+        localStorage.setItem('admin_token', TOKEN);
+        document.getElementById('login').style.display = 'none';
+        loadSection('dashboard');
+    } else {
+        document.getElementById('login-err').style.display = 'block';
+    }
+}
+
+function logout() {
+    TOKEN = null;
+    localStorage.removeItem('admin_token');
+    location.reload();
+}
+
+// Auto-login
+window.onload = () => {
+    const saved = localStorage.getItem('admin_token');
+    if (saved) {
+        TOKEN = saved;
+        document.getElementById('login').style.display = 'none';
+        loadSection('dashboard');
+    }
+    document.getElementById('bc-text').addEventListener('input', function() {
+        document.getElementById('bc-preview').innerHTML = this.value || '—';
+    });
+};
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function go(name) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+    document.getElementById(`s-${name}`).classList.add('active');
+    event.currentTarget.classList.add('active');
+    loadSection(name);
+}
+
+function loadSection(name) {
+    const loaders = {
+        dashboard: loadDashboard,
+        users: loadUsers,
+        logs: loadLogs,
+        sessions: loadSessions,
+        tariffs: loadTariffs,
+        settings: loadSettings
+    };
+    if (loaders[name]) loaders[name]();
+}
+
+// ── API helper ─────────────────────────────────────────────────────────────
+async function api(url, opts = {}) {
+    opts.headers = { ...opts.headers, Authorization: `Bearer ${TOKEN}` };
+    const res = await fetch(url, opts);
+    if (res.status === 401) { logout(); return null; }
+    return res.ok ? res.json() : null;
+}
+
+function toast(msg = '✅ Muvaffaqiyatli!', color = '#22c55e') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.background = color;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+async function loadDashboard() {
+    const d = await api('/api/stats');
+    if (!d) return;
+    document.getElementById('st-total').textContent = d.total_requests ?? '—';
+    document.getElementById('st-ok').textContent = d.success_count ?? '—';
+    document.getElementById('st-err').textContent = d.error_count ?? '—';
+    document.getElementById('st-active').textContent = d.active_users_24h ?? '—';
+}
+
+// ── Users ──────────────────────────────────────────────────────────────────
+async function loadUsers() {
+    const users = await api('/api/users');
+    const tbody = document.getElementById('users-body');
+    if (!users) return;
+    tbody.innerHTML = users.length ? users.map(u => `
+        <tr>
+            <td><code style="font-size:.8rem;color:#94a3b8">${u.id}</code></td>
+            <td>${u.first_name || '—'}</td>
+            <td>${u.username ? '@'+u.username : '—'}</td>
+            <td>${u.downloads_count ?? 0}</td>
+            <td>${u.is_banned
+                ? '<span class="badge badge-red">Bloklangan</span>'
+                : '<span class="badge badge-green">Faol</span>'}</td>
+            <td>
+                <button class="btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-danger'}"
+                    onclick="toggleBan(${u.id}, this)">
+                    ${u.is_banned ? 'Qulfdan chiq.' : 'Bloklash'}
+                </button>
+            </td>
+        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Foydalanuvchilar yo'q</td></tr>`;
+}
+
+async function toggleBan(uid, btn) {
+    await fetch(`/api/users/${uid}/toggle_ban`, { method:'POST', headers:{ Authorization:`Bearer ${TOKEN}` }});
+    toast('Holat o\'zgartirildi');
+    loadUsers();
+}
+
+// ── Logs ───────────────────────────────────────────────────────────────────
+async function loadLogs() {
+    const logs = await api('/api/logs?limit=100');
+    const tbody = document.getElementById('logs-body');
+    if (!logs) return;
+    tbody.innerHTML = logs.length ? logs.map(l => `
+        <tr>
+            <td style="white-space:nowrap;color:var(--muted);font-size:.8rem">${new Date(l.timestamp).toLocaleString()}</td>
+            <td>${l.user_name || l.user_id}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.url||''}">${l.url || '—'}</td>
+            <td>${l.status === 'success'
+                ? '<span class="badge badge-green">OK</span>'
+                : '<span class="badge badge-red">Xato</span>'}</td>
+            <td style="color:var(--danger);font-size:.8rem">${l.error || ''}</td>
+        </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Tarix bo'sh</td></tr>`;
+}
+
+// ── Sessions ───────────────────────────────────────────────────────────────
+async function loadSessions() {
+    const sessions = await api('/api/admin/sessions');
+    const tbody = document.getElementById('sessions-body');
+    if (!sessions) return;
+    tbody.innerHTML = sessions.length ? sessions.map(s => `
+        <tr>
+            <td>${s.id}</td>
+            <td><code style="font-size:.8rem;color:#94a3b8">${s.user_id}</code></td>
+            <td>${s.phone_number}</td>
+            <td>${s.is_active
+                ? '<span class="badge badge-green">Faol</span>'
+                : '<span class="badge badge-red">Nofaol</span>'}</td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="deleteSession(${s.id})">O'chirish</button>
+            </td>
+        </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Sessiyalar yo'q</td></tr>`;
+}
+
+async function deleteSession(id) {
+    if (!confirm('Sessiyani o\'chirishni tasdiqlaysizmi?')) return;
+    await fetch(`/api/admin/sessions/${id}`, { method:'DELETE', headers:{ Authorization:`Bearer ${TOKEN}` }});
+    toast('Sessiya o\'chirildi');
+    loadSessions();
+}
+
+// ── Tariffs ────────────────────────────────────────────────────────────────
+async function loadTariffs() {
+    const tariffs = await api('/api/admin/tariffs');
+    const tbody = document.getElementById('tariffs-body');
+    if (!tariffs) return;
+    tbody.innerHTML = tariffs.length ? tariffs.map(t => `
+        <tr>
+            <td>${t.id}</td>
+            <td><b>${t.name}</b></td>
+            <td>${t.price.toLocaleString()} so'm</td>
+            <td>${(t.max_file_size_bytes/1024**3).toFixed(1)} GB</td>
+            <td>${t.duration_days} kun</td>
+            <td>${t.max_downloads_per_day < 0 ? '♾ Cheksiz' : t.max_downloads_per_day}</td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="deleteTariff(${t.id})">O'chirish</button>
+            </td>
+        </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Tariflar yo'q</td></tr>`;
+}
+
+async function addTariff() {
+    const name = document.getElementById('t-name').value.trim();
+    const price = parseFloat(document.getElementById('t-price').value);
+    const gb = parseFloat(document.getElementById('t-gb').value);
+    const days = parseInt(document.getElementById('t-days').value);
+    const dlimit = parseInt(document.getElementById('t-dlimit').value) || -1;
+
+    if (!name || isNaN(price) || isNaN(gb) || isNaN(days)) {
+        toast('Barcha maydonlarni to\'ldiring!', '#ef4444'); return;
+    }
+
+    const res = await fetch('/api/admin/tariffs', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${TOKEN}` },
+        body: JSON.stringify({
+            name, price,
+            max_file_size_bytes: Math.round(gb * 1024**3),
+            duration_days: days,
+            max_downloads_per_day: dlimit
+        })
+    });
+    if (res.ok) {
+        toast('Tarif qo\'shildi! ✅');
+        ['t-name','t-price','t-gb','t-days','t-dlimit'].forEach(id => document.getElementById(id).value = '');
+        loadTariffs();
+    } else { toast('Xato!', '#ef4444'); }
+}
+
+async function deleteTariff(id) {
+    if (!confirm('Tarifni o\'chirishni tasdiqlaysizmi?')) return;
+    await fetch(`/api/admin/tariffs/${id}`, { method:'DELETE', headers:{ Authorization:`Bearer ${TOKEN}` }});
+    toast('Tarif o\'chirildi');
+    loadTariffs();
+}
+
+// ── Broadcast ──────────────────────────────────────────────────────────────
+async function sendBroadcast() {
+    const text = document.getElementById('bc-text').value.trim();
+    if (!text) { toast('Xabar matnini kiriting!', '#ef4444'); return; }
+    if (!confirm(`Barcha foydalanuvchilarga xabar yuboriladimi?`)) return;
+
+    const res = await fetch('/api/admin/broadcast', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${TOKEN}` },
+        body: JSON.stringify({ text })
+    });
+    if (res.ok) {
+        const d = await res.json();
+        toast(`✅ ${d.users_count} ta foydalanuvchiga yuborildi`);
+        document.getElementById('bc-text').value = '';
+    } else { toast('Xato!', '#ef4444'); }
+}
+
+// ── Settings ───────────────────────────────────────────────────────────────
+async function loadSettings() {
+    const d = await api('/api/admin/settings');
+    if (!d) return;
+    document.getElementById('s-card-num').value = d.card_number || '';
+    document.getElementById('s-card-holder').value = d.card_holder || '';
+    document.getElementById('s-bank').value = d.bank_name || '';
+    document.getElementById('s-channel-id').value = d.payment_channel_id || '';
+}
+
+async function saveSettings() {
+    const data = {
+        card_number: document.getElementById('s-card-num').value.trim(),
+        card_holder: document.getElementById('s-card-holder').value.trim(),
+        bank_name: document.getElementById('s-bank').value.trim(),
+        payment_channel_id: parseInt(document.getElementById('s-channel-id').value) || null
+    };
+    const res = await fetch('/api/admin/settings', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${TOKEN}` },
+        body: JSON.stringify(data)
+    });
+    if (res.ok) { toast('✅ Sozlamalar saqlandi!'); }
+    else { toast('Xato!', '#ef4444'); }
+}
+</script>
 </body>
 </html>

@@ -44,3 +44,18 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
     return token_data
+
+async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
+            raise credentials_exception
+        return int(user_id_str)
+    except (JWTError, ValueError):
+        raise credentials_exception
