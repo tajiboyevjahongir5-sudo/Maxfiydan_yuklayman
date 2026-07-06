@@ -111,6 +111,40 @@ async def cmd_help(message: Message) -> None:
     )
 
 
+@router.message(Command("admin"))
+async def cmd_admin(message: Message) -> None:
+    """Admin panelni Web App sifatida ochish uchun tugma yuboradi."""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    from aiogram.types.web_app_info import WebAppInfo
+    import os
+
+    # Ruxsatni tekshirish (faqat ruxsatli yoki hamma ruxsatli bo'lsa)
+    if not _is_allowed(message.from_user.id):
+        await message.answer("🚫 Sizda admin panelga kirish huquqi yo'q.")
+        return
+
+    # Railway bergan domain yoki localhost
+    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    if domain:
+        url = f"https://{domain}/"
+    else:
+        # Default fallback
+        url = os.getenv("WEBAPP_URL", "https://beneficial-adventure-production.up.railway.app/")
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🛠 Admin Panelni Ochish", web_app=WebAppInfo(url=url))]
+        ]
+    )
+
+    await message.answer(
+        "⚙️ <b>Admin Panel</b>\n\n"
+        "Quyidagi tugmani bosib Web App orqali botni boshqaring:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+
 # ─── Asosiy media yuklovchi handler ─────────────────────────────────────────
 
 @router.message(F.text)

@@ -136,9 +136,12 @@ async def main() -> None:
     asyncio.create_task(server.serve())
     
     try:
+        # Eski webhooklarni o'chirish (agar avval ulab qo'yilgan bo'lsa, polling ishlamaydi)
+        await bot.delete_webhook(drop_pending_updates=True)
+        
+        # Polling boshlash
         await dp.start_polling(
             bot,
-            skip_updates=True,
             allowed_updates=["message", "callback_query"],
         )
     except Exception as e:
