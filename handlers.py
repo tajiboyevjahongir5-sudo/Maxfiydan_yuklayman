@@ -73,7 +73,26 @@ def _is_allowed(user_id: int) -> bool:
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     """Botni ishga tushirganda salomlashish xabarini yuboradi."""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    from aiogram.types.web_app_info import WebAppInfo
+    import os
+    
     user_name = message.from_user.first_name or "Foydalanuvchi"
+    
+    # Railway bergan domain yoki localhost
+    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    if domain:
+        url = f"https://{domain}/"
+    else:
+        # Default fallback
+        url = os.getenv("WEBAPP_URL", "https://maxfiydanyuklayman-production.up.railway.app/")
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🛠 Admin Panel (Web App)", web_app=WebAppInfo(url=url))]
+        ]
+    )
+
     await message.answer(
         f"👋 Salom, <b>{user_name}</b>!\n\n"
         "🔐 Men yopiq Telegram kanallardan media yuklab beruvchi botman.\n\n"
@@ -84,6 +103,7 @@ async def cmd_start(message: Message) -> None:
         "<b>Havola formati:</b>\n"
         "<code>https://t.me/c/1234567890/456</code>\n\n"
         "📎 /help — batafsil yordam",
+        reply_markup=keyboard,
         parse_mode="HTML",
     )
 
