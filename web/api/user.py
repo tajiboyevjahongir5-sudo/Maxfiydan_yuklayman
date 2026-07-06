@@ -43,20 +43,22 @@ async def get_my_profile(user_id: int = Depends(get_current_user_id)):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
             
-        # Get active tariff
+        # Get active tariff (safely handles multiple expired ones)
         tariff_res = await db.execute(
             select(UserTariff)
             .options(selectinload(UserTariff.tariff)) # relationship
             .where(UserTariff.user_id == user_id)
+            .order_by(UserTariff.expires_at.desc())
+            .limit(1)
         )
-        user_tariff = tariff_res.scalar_one_or_none()
+        user_tariff = tariff_res.scalars().first()
         
         # Get total downloaded today/month (mocking total gb for now since we just track size)
         downloads_res = await db.execute(
             select(DownloadHistory).where(DownloadHistory.user_id == user_id)
         )
         downloads = downloads_res.scalars().all()
-        used_bytes = sum([d.file_size_bytes for d in downloads])
+        used_bytes = sum([(d.file_size_bytes or 0) for d in downloads])
         used_gb = used_bytes / (1024 * 1024 * 1024)
         
         if user_tariff and user_tariff.expires_at > datetime.utcnow():

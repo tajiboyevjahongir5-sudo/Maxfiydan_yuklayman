@@ -148,6 +148,9 @@
                         <button @click="sendCode" :disabled="loading" class="btn-primary w-full py-3 rounded-xl font-semibold">
                             {{ loading ? 'Yuborilmoqda...' : 'Kodni olish' }}
                         </button>
+                        <button @click="showWhyPhone = true" class="w-full mt-3 py-2 text-sm text-blue-400 hover:text-blue-300 transition">
+                            ❓ Nima uchun nomer ulashim kerak?
+                        </button>
                     </div>
                     <!-- Step: kod -->
                     <div v-else-if="authStep === 'code'">
@@ -268,7 +271,7 @@
             <!-- ── SOZLAMALAR ── -->
             <div v-else-if="tab === 'sozlama'" key="sozlama" class="space-y-4">
                 <h2 class="text-xl font-bold">Sozlamalar</h2>
-                <div v-if="profile" class="glass p-5 rounded-2xl space-y-5">
+                <div class="glass p-5 rounded-2xl space-y-5">
                     <div class="flex items-center justify-between">
                         <div>
                             <h4 class="font-medium">Video siqish</h4>
@@ -366,7 +369,10 @@ createApp({
 
             // Download
             downloadLink: '',
-            isDownloading: false
+            isDownloading: false,
+
+            // Modals
+            showWhyPhone: false
         };
     },
     methods: {

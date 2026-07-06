@@ -119,12 +119,7 @@ async def cmd_start(message: Message) -> None:
     await message.answer(
         f"👋 Salom, <b>{message.from_user.first_name}</b>!\n\n"
         "🔓 Men yopiq Telegram kanallardan media yuklab beruvchi botman.\n\n"
-        "<b>Qanday foydalanish:</b>\n"
-        "1. Yopiq kanaldan xabar havolasini nusxalab oling\n"
-        "2. Havolani menga yuboring <b>yoki Web App orqali kiriting</b>\n"
-        "3. Media yuklab olinishini kutib turing\n\n"
-        "<b>Havola formati:</b>\n"
-        "<code>https://t.me/c/1234567890/456</code>\n\n"
+        "<b>👇 Pastdagi Web App orqali tizimga kiring va media yuklashni boshlang!</b>\n\n"
         "🔗 /help — batafsil yordam",
         reply_markup=keyboard,
         parse_mode="HTML",
