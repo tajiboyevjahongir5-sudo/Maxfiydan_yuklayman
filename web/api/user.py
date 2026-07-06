@@ -72,11 +72,14 @@ async def get_my_profile(user_id: int = Depends(get_current_user_id)):
             )
         else:
             # Boshlang'ich (tekin) tarif
+            days_used = (datetime.utcnow() - user.registered_at).days
+            days_left = max(0, 3 - days_used)
+            
             tariff_info = CurrentTariff(
                 name="Boshlang'ich (Tekin)",
-                total_gb=2.0,
+                total_gb=0.5,
                 used_gb=used_gb,
-                days_left="Cheksiz"
+                days_left=str(days_left)
             )
 
         return UserProfile(
@@ -137,8 +140,17 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
     from utils import parse_telegram_link
     from userbot import userbot, AccessDeniedError, MessageNotFoundError, NoMediaError, MediaTooLargeError, UserbotError
     from database import async_session, DownloadHistory
+    from limits import check_download_limits, LimitExceededError
     import logging
-    logger = logging.getLogger(__name__)
+    
+    bot_logger = logging.getLogger("web_download")
+    
+    # Yuklash boshlanishidan oldin limitlarni tekshiramiz
+    try:
+        await check_download_limits(user_id)
+    except LimitExceededError as e:
+        await bot.send_message(user_id, f"🚫 <b>Yuklash rad etildi!</b>\n\n{str(e)}", parse_mode="HTML")
+        return
 
     parsed = parse_telegram_link(link)
     if parsed is None:

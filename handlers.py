@@ -237,6 +237,13 @@ async def handle_link(message: Message) -> None:
         return
 
     async with user_lock:
+        from limits import check_download_limits, LimitExceededError
+        try:
+            await check_download_limits(user_id)
+        except LimitExceededError as e:
+            await message.answer(f"🚫 <b>Yuklash rad etildi!</b>\n\n{str(e)}", parse_mode="HTML")
+            return
+
         logger.info(
             f"📨 So'rov qabul qilindi: user={user_id} ({user_name}), "
             f"chat={parsed.chat_id}, msg={parsed.message_id}"
