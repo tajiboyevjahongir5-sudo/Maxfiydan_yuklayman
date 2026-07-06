@@ -126,7 +126,10 @@ async def verify_2fa(req: PasswordRequest, user_id: int = Depends(get_current_us
         
         return {"status": "success", "message": "Akkaunt 2FA orqali muvaffaqiyatli ulandi!"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        error_msg = str(e)
+        if "PASSWORD_HASH_INVALID" in error_msg:
+            raise HTTPException(status_code=400, detail="Parol noto'g'ri! Iltimos tekshirib qaytadan kiriting.")
+        raise HTTPException(status_code=400, detail=error_msg)
 
 @router.get("/status")
 async def check_session_status(user_id: int = Depends(get_current_user_id)):
