@@ -131,34 +131,91 @@ async def update_my_settings(settings: UserSettings, user_id: int = Depends(get_
 class DownloadRequest(BaseModel):
     link: str
 
+async def _do_download(user_id: int, user_first_name: str, link: str):
+    """Web App orqali yuborilgan havolani yuklab, bot orqali foydalanuvchiga yuboradi."""
+    from bot_instance import bot
+    from utils import parse_telegram_link
+    from userbot import userbot, AccessDeniedError, MessageNotFoundError, NoMediaError, MediaTooLargeError, UserbotError
+    from database import async_session, DownloadHistory
+    import logging
+    logger = logging.getLogger(__name__)
+
+    parsed = parse_telegram_link(link)
+    if parsed is None:
+        await bot.send_message(user_id, "❓ Havola noto'g'ri formatda.\n\nTo'g'ri format:\n<code>https://t.me/c/1234567890/456</code>", parse_mode="HTML")
+        return
+
+    progress_msg = await bot.send_message(user_id, "⏳ <b>Yuklanmoqda...</b>\n📡 Xabar olinmoqda...", parse_mode="HTML")
+    downloaded_path = None
+    try:
+        await bot.edit_message_text(user_id, progress_msg.message_id, "📥 <b>Media serverga yuklanmoqda...</b>", parse_mode="HTML")
+        downloaded_path = await userbot.fetch_and_download(user_id, parsed)
+
+        # DB ga tarix yozish
+        async with async_session() as db:
+            from database import DownloadHistory
+            db.add(DownloadHistory(
+                user_id=user_id,
+                file_name=downloaded_path.name,
+                file_size_bytes=downloaded_path.stat().st_size
+            ))
+            await db.commit()
+
+        await bot.edit_message_text(user_id, progress_msg.message_id, "📤 <b>Sizga yuborilmoqda...</b>", parse_mode="HTML")
+
+        from aiogram.types import FSInputFile
+        from utils import get_media_type, MediaType
+        import re
+
+        file = FSInputFile(downloaded_path)
+        name = downloaded_path.name
+        media_type_str = name.split(".")[-1].lower() if "." in name else ""
+
+        if media_type_str in ("mp4", "mov", "avi", "mkv", "webm"):
+            await bot.send_video(user_id, file, caption=f"✅ Muvaffaqiyatli yuklandi!")
+        elif media_type_str in ("jpg", "jpeg", "png", "webp"):
+            await bot.send_photo(user_id, file, caption=f"✅ Muvaffaqiyatli yuklandi!")
+        elif media_type_str in ("mp3", "ogg", "aac", "flac", "m4a"):
+            await bot.send_audio(user_id, file, caption=f"✅ Muvaffaqiyatli yuklandi!")
+        else:
+            await bot.send_document(user_id, file, caption=f"✅ Muvaffaqiyatli yuklandi!")
+
+        await bot.delete_message(user_id, progress_msg.message_id)
+        logger.info(f"✅ Web App yuklash: user={user_id}, fayl={downloaded_path.name}")
+
+    except AccessDeniedError as e:
+        await bot.edit_message_text(user_id, progress_msg.message_id, f"🚫 Kirish taqiqlangan!\n{e}\n\nAkkauntingiz kanalga a'zo ekanligini tekshiring.")
+    except MessageNotFoundError as e:
+        await bot.edit_message_text(user_id, progress_msg.message_id, f"❌ Xabar topilmadi: {e}")
+    except NoMediaError:
+        await bot.edit_message_text(user_id, progress_msg.message_id, "⚠️ Bu xabarda yuklanadigan media yo'q.")
+    except UserbotError as e:
+        await bot.edit_message_text(user_id, progress_msg.message_id,
+            f"⚠️ Sessiyangiz ulanmagan!\n\nWeb App → Ulanish bo'limidan Telegram akkauntingizni ulang.", parse_mode="HTML")
+        logger.error(f"UserbotError: {e}")
+    except Exception as e:
+        logger.error(f"Web download xatolik: {e}", exc_info=True)
+        try:
+            await bot.edit_message_text(user_id, progress_msg.message_id, f"❌ Kutilmagan xatolik: {e}")
+        except Exception:
+            pass
+    finally:
+        if downloaded_path and downloaded_path.exists():
+            downloaded_path.unlink(missing_ok=True)
+
+
 @router.post("/download")
 async def request_download(req: DownloadRequest, user_id: int = Depends(get_current_user_id)):
     """Web app orqali yuborilgan havolani qabul qilib, yuklash jarayonini boshlaydi."""
-    from bot_instance import bot
-    from aiogram.types import Message, User as AiogramUser, Chat
-    from datetime import datetime
     import asyncio
-    from handlers import handle_link
     from database import async_session, User
     from sqlalchemy import select
-    
-    # Ruxsatni tekshirish
+
     async with async_session() as db:
         result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user or user.is_banned:
             raise HTTPException(status_code=403, detail="Ruxsat etilmagan foydalanuvchi")
-    
-    # Fake aiogram message
-    fake_message = Message(
-        message_id=0,
-        date=datetime.now(),
-        chat=Chat(id=user_id, type="private"),
-        from_user=AiogramUser(id=user_id, is_bot=False, first_name=user.first_name),
-        text=req.link
-    ).as_(bot)
-    
-    # Run handle_link in background
-    asyncio.create_task(handle_link(fake_message))
-    
+
+    asyncio.create_task(_do_download(user_id, user.first_name, req.link))
     return {"status": "success"}
