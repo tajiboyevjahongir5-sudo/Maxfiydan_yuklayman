@@ -389,38 +389,6 @@ createApp({
             showWhyPhone: false
         };
     },
-    methods: {
-        async startDownload() {
-            if (!this.downloadLink) return;
-            if (!this.token) {
-                this.tg?.showAlert("Tizimga kirilmagan! Sahifani yopib qaytadan oching.");
-                return;
-            }
-            this.isDownloading = true;
-            try {
-                const res = await fetch('/api/user/download', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
-                    body: JSON.stringify({ link: this.downloadLink })
-                });
-                if (res.ok) {
-                    this.downloadLink = "";
-                    this.tg?.showAlert("✅ Yuklash boshlandi!\n\nBot chatini oching — jarayon u yerda ko'rsatiladi.");
-                } else {
-                    let errMsg = "Xatolik yuz berdi";
-                    try {
-                        const d = await res.json();
-                        errMsg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
-                    } catch {}
-                    this.tg?.showAlert("❌ " + errMsg);
-                }
-            } catch (err) {
-                this.tg?.showAlert("🌐 Serverga ulanishda xatolik!\n" + err.message);
-            } finally {
-                this.isDownloading = false;
-            }
-        }
-    },
     computed: {
         tariffPct() {
             if (!this.profile) return 0;
@@ -466,6 +434,36 @@ createApp({
         await this.loadTariffs();
     },
     methods: {
+        async startDownload() {
+            if (!this.downloadLink) return;
+            if (!this.token) {
+                this.tg?.showAlert("Tizimga kirilmagan! Sahifani yopib qaytadan oching.");
+                return;
+            }
+            this.isDownloading = true;
+            try {
+                const res = await fetch('/api/user/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+                    body: JSON.stringify({ link: this.downloadLink })
+                });
+                if (res.ok) {
+                    this.downloadLink = "";
+                    this.tg?.showAlert("✅ Yuklash boshlandi!\n\nBot chatini oching — jarayon u yerda ko'rsatiladi.");
+                } else {
+                    let errMsg = "Xatolik yuz berdi";
+                    try {
+                        const d = await res.json();
+                        errMsg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
+                    } catch {}
+                    this.tg?.showAlert("❌ " + errMsg);
+                }
+            } catch (err) {
+                this.tg?.showAlert("🌐 Serverga ulanishda xatolik!\n" + err.message);
+            } finally {
+                this.isDownloading = false;
+            }
+        },
         async autoLogin() {
             try {
                 const res = await fetch('/api/auth/telegram', {
