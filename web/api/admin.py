@@ -112,6 +112,23 @@ async def create_tariff(tariff: TariffIn):
         await db.refresh(new_tariff)
         return new_tariff
 
+@router.put("/tariffs/{tariff_id}", response_model=TariffOut)
+async def update_tariff(tariff_id: int, tariff: TariffIn):
+    async with async_session() as db:
+        existing_tariff = await db.get(Tariff, tariff_id)
+        if not existing_tariff:
+            raise HTTPException(status_code=404, detail="Tariff not found")
+        
+        existing_tariff.name = tariff.name
+        existing_tariff.price = tariff.price
+        existing_tariff.max_file_size_bytes = tariff.max_file_size_bytes
+        existing_tariff.max_downloads_per_day = tariff.max_downloads_per_day
+        existing_tariff.duration_days = tariff.duration_days
+        
+        await db.commit()
+        await db.refresh(existing_tariff)
+        return existing_tariff
+
 @router.delete("/tariffs/{tariff_id}")
 async def delete_tariff(tariff_id: int):
     async with async_session() as db:
@@ -158,6 +175,7 @@ class SettingsIn(BaseModel):
     card_holder: Optional[str] = None
     bank_name: Optional[str] = None
     payment_channel_id: Optional[int] = None
+    force_channels: Optional[str] = "[]"
 
 @router.get("/settings")
 async def get_bot_settings():
@@ -165,12 +183,13 @@ async def get_bot_settings():
         result = await db.execute(select(BotSettings).where(BotSettings.id == 1))
         settings = result.scalar_one_or_none()
         if not settings:
-            return {"card_number": None, "card_holder": None, "bank_name": None, "payment_channel_id": None}
+            return {"card_number": None, "card_holder": None, "bank_name": None, "payment_channel_id": None, "force_channels": "[]"}
         return {
             "card_number": settings.card_number,
             "card_holder": settings.card_holder,
             "bank_name": settings.bank_name,
-            "payment_channel_id": settings.payment_channel_id
+            "payment_channel_id": settings.payment_channel_id,
+            "force_channels": settings.force_channels
         }
 
 @router.post("/settings")
@@ -184,13 +203,15 @@ async def save_bot_settings(data: SettingsIn):
             settings.card_holder = data.card_holder
             settings.bank_name = data.bank_name
             settings.payment_channel_id = data.payment_channel_id
+            settings.force_channels = data.force_channels or "[]"
         else:
             settings = BotSettings(
                 id=1,
                 card_number=data.card_number,
                 card_holder=data.card_holder,
                 bank_name=data.bank_name,
-                payment_channel_id=data.payment_channel_id
+                payment_channel_id=data.payment_channel_id,
+                force_channels=data.force_channels or "[]"
             )
             db.add(settings)
 

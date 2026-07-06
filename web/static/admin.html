@@ -328,9 +328,58 @@
                 </div>
             </div>
 
+            <div style="height:1px;background:rgba(255,255,255,.07);margin:1.5rem 0"></div>
+
+            <h3>🔗 Majburiy Obuna Kanallari</h3>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">
+                Foydalanuvchilar botdan foydalanishdan oldin ushbu kanallarga a'zo bo'lishlari shart.<br>
+                <span style="color:var(--warn)">⚠ Bot kanalda <b>admin</b> bo'lishi shart! Yopiq kanallar uchun havola kiritishni unutmang.</span>
+            </p>
+            <div id="force-channels-list" style="margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- JS orqali to'ldiriladi -->
+            </div>
+            
+            <div class="form-row" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px;">
+                <div>
+                    <label>Kanal ID/Username (-100... yoki @kanal)</label>
+                    <input id="fc-id" placeholder="-1001234567890">
+                </div>
+                <div>
+                    <label>Taklif Havolasi (Invite Link)</label>
+                    <input id="fc-url" placeholder="https://t.me/...">
+                </div>
+                <div style="display:flex;align-items:flex-end">
+                    <button class="btn btn-outline" style="width: 100%; border-color: var(--primary); color: var(--primary);" onclick="addForceChannel()">+ Qo'shish</button>
+                </div>
+            </div>
+
             <div style="margin-top:1.5rem;display:flex;gap:.75rem">
                 <button class="btn btn-primary" onclick="saveSettings()">💾 Saqlash</button>
                 <button class="btn btn-outline" onclick="loadSettings()">↺ Qayta yuklash</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Tariff Modal -->
+    <div id="edit-tariff-modal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; padding: 1rem;">
+        <div class="card" style="width:100%; max-width:500px; position:relative;">
+            <button onclick="document.getElementById('edit-tariff-modal').style.display='none'" style="position:absolute; top:1rem; right:1rem; background:none; border:none; color:var(--text); font-size:1.2rem; cursor:pointer;">✕</button>
+            <h3>Tarifni Tahrirlash</h3>
+            <input type="hidden" id="e-id">
+            <div class="form-row">
+                <div><label>Tarif nomi</label><input id="e-name"></div>
+                <div><label>Narxi (so'm)</label><input id="e-price" type="number"></div>
+            </div>
+            <div class="form-row">
+                <div><label>Max fayl hajmi (GB)</label><input id="e-gb" type="number" step="0.1"></div>
+                <div><label>Muddat (kun)</label><input id="e-days" type="number"></div>
+            </div>
+            <div class="form-row">
+                <div><label>Kunlik limit (-1 = cheksiz)</label><input id="e-dlimit" type="number"></div>
+            </div>
+            <div style="margin-top:1.5rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+                <button class="btn btn-outline" onclick="document.getElementById('edit-tariff-modal').style.display='none'">Bekor qilish</button>
+                <button class="btn btn-primary" onclick="saveEditTariff()">💾 Saqlash</button>
             </div>
         </div>
     </div>
@@ -578,9 +627,51 @@ async function loadTariffs() {
             <td>${t.duration_days} kun</td>
             <td>${t.max_downloads_per_day < 0 ? '♾ Cheksiz' : t.max_downloads_per_day}</td>
             <td>
-                <button class="btn btn-sm btn-danger" onclick="deleteTariff(${t.id})">O'chirish</button>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:flex-end;">
+                    <button class="btn btn-sm btn-outline" style="border-color:var(--primary);color:var(--primary)" onclick='openEditTariff(${JSON.stringify(t)})'>Tahrirlash</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteTariff(${t.id})">O'chirish</button>
+                </div>
             </td>
         </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Tariflar yo'q</td></tr>`;
+}
+
+function openEditTariff(t) {
+    document.getElementById('e-id').value = t.id;
+    document.getElementById('e-name').value = t.name;
+    document.getElementById('e-price').value = t.price;
+    document.getElementById('e-gb').value = (t.max_file_size_bytes / 1024**3).toFixed(1);
+    document.getElementById('e-days').value = t.duration_days;
+    document.getElementById('e-dlimit').value = t.max_downloads_per_day;
+    document.getElementById('edit-tariff-modal').style.display = 'flex';
+}
+
+async function saveEditTariff() {
+    const id = document.getElementById('e-id').value;
+    const name = document.getElementById('e-name').value.trim();
+    const price = parseFloat(document.getElementById('e-price').value);
+    const gb = parseFloat(document.getElementById('e-gb').value);
+    const days = parseInt(document.getElementById('e-days').value);
+    const dlimit = parseInt(document.getElementById('e-dlimit').value) || -1;
+
+    if (!name || isNaN(price) || isNaN(gb) || isNaN(days)) {
+        toast('Barcha maydonlarni to\'ldiring!', '#ef4444'); return;
+    }
+
+    const res = await fetch(`/api/admin/tariffs/${id}`, {
+        method:'PUT',
+        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${TOKEN}` },
+        body: JSON.stringify({
+            name, price,
+            max_file_size_bytes: Math.round(gb * 1024**3),
+            duration_days: days,
+            max_downloads_per_day: dlimit
+        })
+    });
+    if (res.ok) {
+        toast('Tarif tahrirlandi! ✅');
+        document.getElementById('edit-tariff-modal').style.display = 'none';
+        loadTariffs();
+    } else { toast('Xato!', '#ef4444'); }
 }
 
 async function addTariff() {
@@ -637,6 +728,38 @@ async function sendBroadcast() {
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
+let forceChannels = [];
+
+function renderForceChannels() {
+    const list = document.getElementById('force-channels-list');
+    list.innerHTML = forceChannels.length ? forceChannels.map((c, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:var(--card); padding:0.75rem 1rem; border-radius:8px; border:1px solid var(--border);">
+            <div>
+                <p style="font-weight:bold; margin-bottom:0.25rem;">${c.id}</p>
+                <a href="${c.url}" target="_blank" style="font-size:0.8rem; color:var(--primary);">${c.url}</a>
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="removeForceChannel(${i})">✕</button>
+        </div>
+    `).join('') : '<p style="color:var(--muted); font-size:0.85rem;">Hozircha hech qanday kanal yo\'q.</p>';
+}
+
+function addForceChannel() {
+    const id = document.getElementById('fc-id').value.trim();
+    const url = document.getElementById('fc-url').value.trim();
+    if (!id || !url) {
+        toast('Kanal ID va Havolasini to\'ldiring!', '#ef4444'); return;
+    }
+    forceChannels.push({ id, url });
+    document.getElementById('fc-id').value = '';
+    document.getElementById('fc-url').value = '';
+    renderForceChannels();
+}
+
+function removeForceChannel(index) {
+    forceChannels.splice(index, 1);
+    renderForceChannels();
+}
+
 async function loadSettings() {
     const d = await api('/api/admin/settings');
     if (!d) return;
@@ -644,6 +767,13 @@ async function loadSettings() {
     document.getElementById('s-card-holder').value = d.card_holder || '';
     document.getElementById('s-bank').value = d.bank_name || '';
     document.getElementById('s-channel-id').value = d.payment_channel_id || '';
+    
+    try {
+        forceChannels = JSON.parse(d.force_channels || "[]");
+    } catch(e) {
+        forceChannels = [];
+    }
+    renderForceChannels();
 }
 
 async function saveSettings() {
@@ -651,7 +781,8 @@ async function saveSettings() {
         card_number: document.getElementById('s-card-num').value.trim(),
         card_holder: document.getElementById('s-card-holder').value.trim(),
         bank_name: document.getElementById('s-bank').value.trim(),
-        payment_channel_id: parseInt(document.getElementById('s-channel-id').value) || null
+        payment_channel_id: parseInt(document.getElementById('s-channel-id').value) || null,
+        force_channels: JSON.stringify(forceChannels)
     };
     const res = await fetch('/api/admin/settings', {
         method:'POST',

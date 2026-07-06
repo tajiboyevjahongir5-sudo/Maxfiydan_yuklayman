@@ -134,6 +134,7 @@ class BotSettings(Base):
     card_holder: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     bank_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     payment_channel_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    force_channels: Mapped[str] = mapped_column(Text, default="[]") # JSON string containing list of dicts: [{"id": "...", "url": "..."}]
 
 
 # ─── Init DB Function ───────────────────────────────────────────────────────

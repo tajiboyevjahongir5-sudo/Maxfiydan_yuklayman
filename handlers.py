@@ -68,11 +68,79 @@ def _is_allowed(user_id: int) -> bool:
     return user_id in config.allowed_users
 
 
+import json
+from database import get_settings
+
+async def enforce_subscriptions(message: Message, user_id: int = None) -> bool:
+    """
+    Majburiy kanallarga a'zolikni tekshiradi.
+    Agar hamma kanallarga a'zo bo'lsa True,
+    Aks holda (xabar yuborib) False qaytaradi.
+    """
+    if user_id is None:
+        user_id = message.from_user.id
+
+    settings = await get_settings()
+    if not settings or not settings.force_channels:
+        return True
+    
+    try:
+        channels = json.loads(settings.force_channels)
+    except Exception:
+        return True
+    
+    if not channels:
+        return True
+        
+    missing = []
+    for c in channels:
+        try:
+            member = await message.bot.get_chat_member(chat_id=c['id'], user_id=user_id)
+            if member.status in ['left', 'kicked']:
+                missing.append(c)
+        except Exception:
+            # Agar bot kanalda yo'q bo'lsa yoki ID xato bo'lsa, o'tkazib yuboramiz.
+            # Yoki missing qatoriga qo'shish mumkin, lekin yaxshisi o'tkazvorish.
+            pass
+            
+    if missing:
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        buttons = []
+        for i, c in enumerate(missing, 1):
+            buttons.append([InlineKeyboardButton(text=f"📢 {i}-Kanalga a'zo bo'lish", url=c['url'])])
+        buttons.append([InlineKeyboardButton(text="✅ Tasdiqlash", callback_data="check_sub")])
+        
+        await message.answer(
+            "🛑 <b>Botdan foydalanish uchun quyidagi kanallarga a'zo bo'lishingiz shart!</b>\n\n"
+            "Iltimos, avval kanallarga obuna bo'ling va so'ngra <b>Tasdiqlash</b> tugmasini bosing.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            parse_mode="HTML"
+        )
+        return False
+        
+    return True
+
+# ─── Callback handler for check_sub ──────────────────────────────────────────
+@router.callback_query(F.data == "check_sub")
+async def cb_check_sub(call: CallbackQuery):
+    await call.answer()
+    if await enforce_subscriptions(call.message, user_id=call.from_user.id):
+        # A'zo bo'lgan bo'lsa
+        # Eski xabarni o'chirish (Tasdiqlash yuborilgan xabarni)
+        try:
+            await call.message.delete()
+        except Exception:
+            pass
+        await call.message.answer("✅ Rahmat! Endi botdan to'liq foydalanishingiz mumkin. Havola yuboring yoki /start ni bosing.")
+
 # ─── /start va /help handleri ────────────────────────────────────────────────
 
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     """Botni ishga tushirganda salomlashish xabarini yuboradi va userni bazaga saqlaydi."""
+    if not await enforce_subscriptions(message):
+        return
+
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     from aiogram.types.web_app_info import WebAppInfo
     from database import async_session, User
@@ -199,6 +267,9 @@ async def handle_link(message: Message) -> None:
     user_id   = message.from_user.id
     user_name = message.from_user.first_name or str(user_id)
     text      = message.text or ""
+
+    if not await enforce_subscriptions(message):
+        return
 
     # ── 1. Ruxsatni DB orqali tekshirish ──────────────────────────────────────
     from database import async_session, User, DownloadHistory
