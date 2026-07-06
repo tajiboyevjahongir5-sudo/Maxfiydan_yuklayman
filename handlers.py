@@ -256,7 +256,7 @@ async def handle_link(message: Message) -> None:
             from utils import human_readable_size
             last_edit_time = 0
 
-            async def on_download_progress(current: int, total: int):
+            async def on_download_progress(current: int, total: int, *args, **kwargs):
                 nonlocal last_edit_time
                 now = time.time()
                 # 2 soniyada bir marta yangilash (FloodWait oldini olish uchun)
@@ -265,11 +265,12 @@ async def handle_link(message: Message) -> None:
                     pct = (current / total * 100) if total else 0
                     c_str = human_readable_size(current)
                     t_str = human_readable_size(total) if total else "?"
-                    await _edit_progress(progress_msg, 
+                    import asyncio
+                    asyncio.create_task(_edit_progress(progress_msg, 
                         f"📥 <b>Media serverga yuklanmoqda...</b>\n\n"
                         f"📊 {pct:.1f}%\n"
                         f"💾 {c_str} / {t_str}"
-                    )
+                    ))
 
             # ── 5. Userbot orqali media yuklab olish ──────────────────────
             await _edit_progress(progress_msg, "📥 Media serverga yuklanmoqda...")

@@ -152,7 +152,7 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
         from utils import human_readable_size
         last_edit_time = 0
 
-        async def on_download_progress(current: int, total: int):
+        async def on_download_progress(current: int, total: int, *args, **kwargs):
             nonlocal last_edit_time
             now = time.time()
             if now - last_edit_time > 2.0:
@@ -160,16 +160,20 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
                 pct = (current / total * 100) if total else 0
                 c_str = human_readable_size(current)
                 t_str = human_readable_size(total) if total else "?"
-                try:
-                    await bot.edit_message_text(
-                        user_id, progress_msg.message_id, 
-                        f"📥 <b>Media serverga yuklanmoqda...</b>\n\n"
-                        f"📊 {pct:.1f}%\n"
-                        f"💾 {c_str} / {t_str}", 
-                        parse_mode="HTML"
-                    )
-                except Exception:
-                    pass
+                import asyncio
+                
+                async def _update_ui():
+                    try:
+                        await bot.edit_message_text(
+                            user_id, progress_msg.message_id, 
+                            f"📥 <b>Media serverga yuklanmoqda...</b>\n\n"
+                            f"📊 {pct:.1f}%\n"
+                            f"💾 {c_str} / {t_str}", 
+                            parse_mode="HTML"
+                        )
+                    except Exception:
+                        pass
+                asyncio.create_task(_update_ui())
 
         await bot.edit_message_text(user_id, progress_msg.message_id, "📥 <b>Media serverga yuklanmoqda...</b>", parse_mode="HTML")
         downloaded_path, media_type = await userbot.fetch_and_download(user_id, parsed, progress_callback=on_download_progress)
