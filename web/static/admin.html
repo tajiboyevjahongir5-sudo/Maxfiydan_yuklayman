@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Media Bot - Admin Panel</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="login-card glass">
+            <h2>Admin Panel</h2>
+            <div class="input-group">
+                <label>Admin Maxfiy Kaliti (Parol)</label>
+                <input type="password" id="password" placeholder="Maxfiy kalitni kiriting...">
+            </div>
+            <button id="login-btn">Kirish</button>
+        </div>
+    </div>
+
+    <!-- App Container -->
+    <div id="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h3>🤖 Media Bot</h3>
+            <ul class="nav-links">
+                <li class="active" data-target="dashboard">📊 Dashboard</li>
+                <li data-target="users">👥 Foydalanuvchilar</li>
+                <li data-target="logs">📋 So'rovlar Tarixi</li>
+                <li data-target="settings">⚙️ Sozlamalar</li>
+                <li id="logout-btn" style="color: var(--danger); margin-top: auto;">🚪 Chiqish</li>
+            </ul>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- Dashboard View -->
+            <section id="dashboard" class="view active">
+                <h2>Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card glass">
+                        <h4>Jami So'rovlar</h4>
+                        <div class="value" id="total-req">0</div>
+                    </div>
+                    <div class="stat-card glass">
+                        <h4>Muvaffaqiyatli</h4>
+                        <div class="value" style="color: var(--success)" id="success-req">0</div>
+                    </div>
+                    <div class="stat-card glass">
+                        <h4>Xatolar</h4>
+                        <div class="value" style="color: var(--danger)" id="error-req">0</div>
+                    </div>
+                    <div class="stat-card glass">
+                        <h4>Faol Foydalanuvchilar</h4>
+                        <div class="value" id="active-users">0</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Users View -->
+            <section id="users" class="view">
+                <h2>Foydalanuvchilar</h2>
+                <div class="glass table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Ism</th>
+                                <th>So'rovlar</th>
+                                <th>Oxirgi Faollik</th>
+                                <th>Amal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Logs View -->
+            <section id="logs" class="view">
+                <h2>So'rovlar Tarixi (Oxirgi 200)</h2>
+                <div class="glass table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Vaqt</th>
+                                <th>Foydalanuvchi</th>
+                                <th>Havola</th>
+                                <th>Status</th>
+                                <th>Xatolik Matni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Settings View -->
+            <section id="settings" class="view">
+                <h2>Bot Sozlamalari (.env)</h2>
+                <div class="glass" style="padding: 2rem;">
+                    <p style="margin-bottom: 1rem; color: var(--tg-theme-hint-color);">Sozlamalarni o'zgartirish uchun serverdagi .env faylini tahrirlab, botni qayta ishga tushiring.</p>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Maksimal fayl hajmi (MB):</strong> <span id="set-max-size">-</span>
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Yuklamalar papkasi:</strong> <span id="set-dl-dir">-</span>
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Ruxsatli foydalanuvchilar ID (ALLOW_USERS):</strong> <br>
+                        <code id="set-allowed" style="background: rgba(0,0,0,0.2); padding: 0.5rem; display: block; border-radius: 4px; margin-top: 0.5rem;">-</code>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

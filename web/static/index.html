@@ -3,127 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Media Bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Telegram Media Bot</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --tg-theme-bg-color: var(--bg-dark);
+            --tg-theme-text-color: var(--text-main);
+            --tg-theme-button-color: var(--primary);
+            --tg-theme-button-text-color: #ffffff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, var(--bg-dark));
+            color: var(--tg-theme-text-color, var(--text-main));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Hero Image with Glassmorphism Overlay */
+        .hero-section {
+            position: relative;
+            width: 100%;
+            height: 45vh;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            background: url('/static/hero.png') no-repeat center center;
+            background-size: cover;
+        }
+        
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0; top: 0;
+            background: linear-gradient(to top, var(--tg-theme-bg-color, var(--bg-dark)) 0%, rgba(15, 23, 42, 0.2) 100%);
+            z-index: 1;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            padding: 2rem;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .hero-content h1 {
+            margin: 0;
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .hero-content p {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        /* Glassmorphism Cards */
+        .container {
+            width: 90%;
+            max-width: 500px;
+            margin-top: -20px;
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding-bottom: 2rem;
+        }
+
+        .glass-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideUp 0.6s forwards;
+        }
+
+        .glass-card:nth-child(1) { animation-delay: 0.2s; }
+        .glass-card:nth-child(2) { animation-delay: 0.4s; }
+        .glass-card:nth-child(3) { animation-delay: 0.6s; }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin-bottom: 1rem;
+        }
+        
+        .card-header .icon {
+            font-size: 1.5rem;
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem;
+            border-radius: 50%;
+        }
+
+        .card-header h3 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        ul.feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        ul.feature-list li {
+            position: relative;
+            padding-left: 1.5rem;
+            margin-bottom: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        ul.feature-list li::before {
+            content: '⚡';
+            position: absolute;
+            left: 0;
+            top: 2px;
+            font-size: 0.9rem;
+        }
+
+        /* Close App Button */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 12px;
+            background: var(--tg-theme-button-color, var(--primary));
+            color: var(--tg-theme-button-text-color, #ffffff);
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+            margin-top: 1rem;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+    </style>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 
-    <!-- Login Screen -->
-    <div id="login-screen">
-        <div class="login-card glass">
-            <h2>Admin Panel</h2>
-            <div class="input-group">
-                <label>Admin Maxfiy Kaliti (Parol)</label>
-                <input type="password" id="password" placeholder="Maxfiy kalitni kiriting...">
-            </div>
-            <button id="login-btn">Kirish</button>
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1>Maxfiy Media Bot</h1>
+            <p>Siz uchun maxsus ishlab chiqilgan, yopiq kanallardan media yuklovchi bot.</p>
         </div>
-    </div>
+    </section>
 
-    <!-- App Container -->
-    <div id="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <h3>🤖 Media Bot</h3>
-            <ul class="nav-links">
-                <li class="active" data-target="dashboard">📊 Dashboard</li>
-                <li data-target="users">👥 Foydalanuvchilar</li>
-                <li data-target="logs">📋 So'rovlar Tarixi</li>
-                <li data-target="settings">⚙️ Sozlamalar</li>
-                <li id="logout-btn" style="color: var(--danger); margin-top: auto;">🚪 Chiqish</li>
+    <div class="container">
+        <!-- Qanday ishlashi haqida karta -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="icon">🚀</span>
+                <h3>Qanday ishlashi?</h3>
+            </div>
+            <ul class="feature-list">
+                <li>Siz Telegramdagi yopiq kanal postining havolasini nusxalaysiz (Copy Link).</li>
+                <li>Havolani to'g'ridan-to'g'ri menga (botga) yuborasiz.</li>
+                <li>Men videoni yuklab olib sizning shu chatingizga yuboraman!</li>
             </ul>
-        </aside>
+        </div>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            
-            <!-- Dashboard View -->
-            <section id="dashboard" class="view active">
-                <h2>Dashboard</h2>
-                <div class="stats-grid">
-                    <div class="stat-card glass">
-                        <h4>Jami So'rovlar</h4>
-                        <div class="value" id="total-req">0</div>
-                    </div>
-                    <div class="stat-card glass">
-                        <h4>Muvaffaqiyatli</h4>
-                        <div class="value" style="color: var(--success)" id="success-req">0</div>
-                    </div>
-                    <div class="stat-card glass">
-                        <h4>Xatolar</h4>
-                        <div class="value" style="color: var(--danger)" id="error-req">0</div>
-                    </div>
-                    <div class="stat-card glass">
-                        <h4>Faol Foydalanuvchilar</h4>
-                        <div class="value" id="active-users">0</div>
-                    </div>
-                </div>
-            </section>
+        <!-- Cheklovlar va Imkoniyatlar -->
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="icon">✨</span>
+                <h3>Imkoniyatlar</h3>
+            </div>
+            <ul class="feature-list">
+                <li>Video, Rasm, Audio, Fayl - har qanday media turlarini yuklay olaman.</li>
+                <li>Fayllar sizga asl formatida va yuqori tezlikda jo'natiladi.</li>
+                <li>Foydalanuvchi ma'lumotlari xavfsizligi ta'minlangan.</li>
+            </ul>
+        </div>
 
-            <!-- Users View -->
-            <section id="users" class="view">
-                <h2>Foydalanuvchilar</h2>
-                <div class="glass table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Ism</th>
-                                <th>So'rovlar</th>
-                                <th>Oxirgi Faollik</th>
-                                <th>Amal</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-table">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Logs View -->
-            <section id="logs" class="view">
-                <h2>So'rovlar Tarixi (Oxirgi 200)</h2>
-                <div class="glass table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Vaqt</th>
-                                <th>Foydalanuvchi</th>
-                                <th>Havola</th>
-                                <th>Status</th>
-                                <th>Xatolik Matni</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logs-table">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Settings View -->
-            <section id="settings" class="view">
-                <h2>Bot Sozlamalari (.env)</h2>
-                <div class="glass" style="padding: 2rem;">
-                    <p style="margin-bottom: 1rem; color: var(--tg-theme-hint-color);">Sozlamalarni o'zgartirish uchun serverdagi .env faylini tahrirlab, botni qayta ishga tushiring.</p>
-                    
-                    <div style="margin-bottom: 1rem;">
-                        <strong>Maksimal fayl hajmi (MB):</strong> <span id="set-max-size">-</span>
-                    </div>
-                    <div style="margin-bottom: 1rem;">
-                        <strong>Yuklamalar papkasi:</strong> <span id="set-dl-dir">-</span>
-                    </div>
-                    <div style="margin-bottom: 1rem;">
-                        <strong>Ruxsatli foydalanuvchilar ID (ALLOW_USERS):</strong> <br>
-                        <code id="set-allowed" style="background: rgba(0,0,0,0.2); padding: 0.5rem; display: block; border-radius: 4px; margin-top: 0.5rem;">-</code>
-                    </div>
-                </div>
-            </section>
-
-        </main>
+        <button class="btn" onclick="closeApp()">Tushunarli, Botga qaytish</button>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script>
+        // Initialize Telegram WebApp
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // MainButton functionality
+        tg.MainButton.text = "BOTDAN FOYDALANISH";
+        tg.MainButton.show();
+        tg.MainButton.onClick(function() {
+            tg.close();
+        });
+
+        // Close function for HTML button
+        function closeApp() {
+            tg.close();
+        }
+        
+        // Dynamically match colors with user's TG theme
+        document.documentElement.style.setProperty('--bg-dark', tg.themeParams.bg_color || '#0f172a');
+        document.documentElement.style.setProperty('--text-main', tg.themeParams.text_color || '#f8fafc');
+        document.documentElement.style.setProperty('--primary', tg.themeParams.button_color || '#3b82f6');
+    </script>
 </body>
 </html>

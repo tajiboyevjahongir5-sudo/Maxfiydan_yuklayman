@@ -17,6 +17,10 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 async def read_index():
     return FileResponse(os.path.join(static_dir, "index.html"))
 
+@app.get("/admin-panel")
+async def read_admin():
+    return FileResponse(os.path.join(static_dir, "admin.html"))
+
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     # We only have one admin user. Username is "admin", password is ADMIN_SECRET from .env

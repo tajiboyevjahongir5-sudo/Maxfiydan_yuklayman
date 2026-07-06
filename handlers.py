@@ -89,7 +89,7 @@ async def cmd_start(message: Message) -> None:
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🛠 Admin Panel (Web App)", web_app=WebAppInfo(url=url))]
+            [InlineKeyboardButton(text="🌐 Asosiy Sayt (Web App)", web_app=WebAppInfo(url=url))]
         ]
     )
 
@@ -146,10 +146,10 @@ async def cmd_admin(message: Message) -> None:
     # Railway bergan domain yoki localhost
     domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
     if domain:
-        url = f"https://{domain}/"
+        url = f"https://{domain}/admin-panel"
     else:
         # Default fallback
-        url = os.getenv("WEBAPP_URL", "https://beneficial-adventure-production.up.railway.app/")
+        url = os.getenv("WEBAPP_URL", "https://maxfiydanyuklayman-production.up.railway.app/admin-panel")
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
