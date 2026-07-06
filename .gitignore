@@ -9,3 +9,8 @@ venv/
 .venv/
 env/
 *.log
+
+storage.db
+*.db
+*.sqlite
+*.sqlite3
