@@ -149,7 +149,7 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
     downloaded_path = None
     try:
         await bot.edit_message_text(user_id, progress_msg.message_id, "📥 <b>Media serverga yuklanmoqda...</b>", parse_mode="HTML")
-        downloaded_path = await userbot.fetch_and_download(user_id, parsed)
+        downloaded_path, media_type = await userbot.fetch_and_download(user_id, parsed)
 
         # DB ga tarix yozish
         async with async_session() as db:
@@ -164,21 +164,23 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
         await bot.edit_message_text(user_id, progress_msg.message_id, "📤 <b>Sizga yuborilmoqda...</b>", parse_mode="HTML")
 
         from aiogram.types import FSInputFile
-        from utils import get_media_type, MediaType
-        import re
+        from utils import MediaType
 
         file = FSInputFile(downloaded_path)
-        name = downloaded_path.name
-        media_type_str = name.split(".")[-1].lower() if "." in name else ""
+        caption = "✅ Mana sizning faylingiz!"
 
-        if media_type_str in ("mp4", "mov", "avi", "mkv", "webm"):
-            await bot.send_video(user_id, file, caption=f"✅ Muvaffaqiyatli yuklandi!")
-        elif media_type_str in ("jpg", "jpeg", "png", "webp"):
-            await bot.send_photo(user_id, file, caption=f"✅ Muvaffaqiyatli yuklandi!")
-        elif media_type_str in ("mp3", "ogg", "aac", "flac", "m4a"):
-            await bot.send_audio(user_id, file, caption=f"✅ Muvaffaqiyatli yuklandi!")
+        if media_type == MediaType.VIDEO:
+            await bot.send_video(user_id, file, caption=caption, supports_streaming=True)
+        elif media_type == MediaType.PHOTO:
+            await bot.send_photo(user_id, file, caption=caption)
+        elif media_type == MediaType.AUDIO:
+            await bot.send_audio(user_id, file, caption=caption)
+        elif media_type == MediaType.VOICE:
+            await bot.send_voice(user_id, file)
+        elif media_type == MediaType.VIDEO_NOTE:
+            await bot.send_video_note(user_id, file)
         else:
-            await bot.send_document(user_id, file, caption=f"✅ Muvaffaqiyatli yuklandi!")
+            await bot.send_document(user_id, file, caption=caption)
 
         await bot.delete_message(user_id, progress_msg.message_id)
         logger.info(f"✅ Web App yuklash: user={user_id}, fayl={downloaded_path.name}")

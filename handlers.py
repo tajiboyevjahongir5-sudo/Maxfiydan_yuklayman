@@ -254,7 +254,7 @@ async def handle_link(message: Message) -> None:
         try:
             # ── 5. Userbot orqali media yuklab olish ──────────────────────
             await _edit_progress(progress_msg, "📥 Media serverga yuklanmoqda...")
-            downloaded_path = await userbot.fetch_and_download(user_id, parsed)
+            downloaded_path, media_type = await userbot.fetch_and_download(user_id, parsed)
 
             # DB ga tarix yozish
             async with async_session() as db:
@@ -268,7 +268,7 @@ async def handle_link(message: Message) -> None:
 
             # ── 6. Aiogram orqali foydalanuvchiga yuborish ─────────────────
             await _edit_progress(progress_msg, "📤 Sizga yuborilmoqda...")
-            await _send_file_to_user(message, downloaded_path)
+            await _send_file_to_user(message, downloaded_path, media_type)
 
             logger.info(
                 f"✅ Muvaffaqiyatli yuborildi: user={user_id}, "
@@ -355,53 +355,47 @@ async def _edit_progress(progress_msg: Message, text: str) -> None:
         logger.debug(f"Progress xabarini yangilashda xato (muhim emas): {e}")
 
 
-async def _send_file_to_user(message: Message, file_path: Path) -> None:
+async def _send_file_to_user(message: Message, file_path: Path, media_type=None) -> None:
     """
     Faylni aiogram FSInputFile orqali foydalanuvchiga yuboradi.
-    Media turiga qarab mos Telegram usulini (send_photo, send_video va h.k.) tanlaydi.
-
-    Args:
-        message: Asl foydalanuvchi xabari (reply uchun ishlatiladi).
-        file_path: Yuklab olingan faylning yo'li.
-
-    Raises:
-        TelegramAPIError: Fayl yuborishda Telegram API xatosi.
+    Media turini Pyrogram media_type dan aniqlanadi (kengaytmadan emas).
     """
+    from utils import MediaType
     input_file = FSInputFile(path=file_path)
-    suffix = file_path.suffix.lower()
 
-    # Fayl kengaytmasi bo'yicha media turini aniqlash
-    if suffix in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
+    if media_type == MediaType.PHOTO:
         await message.answer_photo(
             photo=input_file,
             caption="✅ Mana sizning rasmingiz!",
         )
-
-    elif suffix in {".mp4", ".mov", ".avi", ".mkv", ".webm"}:
+    elif media_type == MediaType.VIDEO:
         await message.answer_video(
             video=input_file,
             caption="✅ Mana sizning videongiz!",
             supports_streaming=True,
         )
-
-    elif suffix in {".mp3", ".flac", ".ogg", ".aac", ".wav", ".m4a"}:
+    elif media_type == MediaType.AUDIO:
         await message.answer_audio(
             audio=input_file,
             caption="✅ Mana sizning audiongiz!",
         )
-
-    elif suffix == ".oga":
-        # Telegram voice xabarlari .oga formatida keladi
-        await message.answer_voice(
-            voice=input_file,
-        )
-
-    elif suffix in {".mp4v"} or "video_note" in file_path.name:
+    elif media_type == MediaType.VOICE:
+        await message.answer_voice(voice=input_file)
+    elif media_type == MediaType.VIDEO_NOTE:
         await message.answer_video_note(video_note=input_file)
-
     else:
-        # Boshqa barcha formatlar — hujjat sifatida yuborish
-        await message.answer_document(
-            document=input_file,
-            caption="✅ Mana sizning faylingiz!",
-        )
+        # Agar media_type noma'lum bo'lsa yoki DOCUMENT — kengaytmadan ham urinib ko'ramiz
+        suffix = file_path.suffix.lower()
+        if suffix in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
+            await message.answer_photo(photo=input_file, caption="✅ Mana sizning rasmingiz!")
+        elif suffix in {".mp4", ".mov", ".avi", ".mkv", ".webm"}:
+            await message.answer_video(video=input_file, caption="✅ Mana sizning videongiz!", supports_streaming=True)
+        elif suffix in {".mp3", ".flac", ".ogg", ".aac", ".wav", ".m4a"}:
+            await message.answer_audio(audio=input_file, caption="✅ Mana sizning audiongiz!")
+        elif suffix == ".oga":
+            await message.answer_voice(voice=input_file)
+        else:
+            await message.answer_document(
+                document=input_file,
+                caption="✅ Mana sizning faylingiz!",
+            )

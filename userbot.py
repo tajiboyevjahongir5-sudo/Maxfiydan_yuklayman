@@ -162,14 +162,16 @@ class SessionManager:
             )
         return self.clients[user_id]
 
-    async def fetch_and_download(self, user_id: int, parsed_link: ParsedLink) -> Path:
+    async def fetch_and_download(self, user_id: int, parsed_link: ParsedLink):
         """
         Maxsus user_id sessiyasi yordamida medialni yuklab oladi.
+        (path, media_type) tuple qaytaradi.
         """
         client = self.get_client(user_id)
         message = await self._get_message(client, parsed_link)
+        media_type = get_media_type(message)
         file_path = await self._download_media(client, message)
-        return file_path
+        return file_path, media_type
 
     async def _get_message(self, client: Client, parsed_link: ParsedLink) -> PyroMessage:
         max_retries = 3
