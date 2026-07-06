@@ -15,9 +15,22 @@
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 
+# ─── MUHIM: Python 3.10+ + Pyrogram moslik tuzatishi ────────────────────────
+# Pyrogram import vaqtida asyncio.get_event_loop() chaqiradi.
+# Python 3.10+ da event loop oldindan bo'lmasa RuntimeError beradi.
+# Shuning uchun barcha import lardan OLDIN event loop yaratib qo'yamiz.
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    _loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(_loop)
+# ─────────────────────────────────────────────────────────────────────────────
+
+import uvicorn
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -26,8 +39,6 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import config
 from handlers import router
 from userbot import userbot
-import os
-import uvicorn
 from web.app import app as web_app
 
 logger = logging.getLogger(__name__)
