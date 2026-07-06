@@ -252,9 +252,28 @@ async def handle_link(message: Message) -> None:
         downloaded_path: Path | None = None
 
         try:
+            import time
+            from utils import human_readable_size
+            last_edit_time = 0
+
+            async def on_download_progress(current: int, total: int):
+                nonlocal last_edit_time
+                now = time.time()
+                # 2 soniyada bir marta yangilash (FloodWait oldini olish uchun)
+                if now - last_edit_time > 2.0:
+                    last_edit_time = now
+                    pct = (current / total * 100) if total else 0
+                    c_str = human_readable_size(current)
+                    t_str = human_readable_size(total) if total else "?"
+                    await _edit_progress(progress_msg, 
+                        f"📥 <b>Media serverga yuklanmoqda...</b>\n\n"
+                        f"📊 {pct:.1f}%\n"
+                        f"💾 {c_str} / {t_str}"
+                    )
+
             # ── 5. Userbot orqali media yuklab olish ──────────────────────
             await _edit_progress(progress_msg, "📥 Media serverga yuklanmoqda...")
-            downloaded_path, media_type = await userbot.fetch_and_download(user_id, parsed)
+            downloaded_path, media_type = await userbot.fetch_and_download(user_id, parsed, progress_callback=on_download_progress)
 
             # DB ga tarix yozish
             async with async_session() as db:

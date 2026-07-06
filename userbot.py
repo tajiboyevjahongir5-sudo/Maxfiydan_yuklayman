@@ -162,7 +162,7 @@ class SessionManager:
             )
         return self.clients[user_id]
 
-    async def fetch_and_download(self, user_id: int, parsed_link: ParsedLink):
+    async def fetch_and_download(self, user_id: int, parsed_link: ParsedLink, progress_callback=None):
         """
         Maxsus user_id sessiyasi yordamida medialni yuklab oladi.
         (path, media_type) tuple qaytaradi.
@@ -170,7 +170,7 @@ class SessionManager:
         client = self.get_client(user_id)
         message = await self._get_message(client, parsed_link)
         media_type = get_media_type(message)
-        file_path = await self._download_media(client, message)
+        file_path = await self._download_media(client, message, progress_callback)
         return file_path, media_type
 
     async def _get_message(self, client: Client, parsed_link: ParsedLink) -> PyroMessage:
@@ -213,7 +213,7 @@ class SessionManager:
                     raise UserbotError(f"Telegram API xatosi: {e.MESSAGE}") from e
                 await asyncio.sleep(2 ** attempt)
 
-    async def _download_media(self, client: Client, message: PyroMessage) -> Path:
+    async def _download_media(self, client: Client, message: PyroMessage, progress_callback=None) -> Path:
         media_type = get_media_type(message)
         file_size = self._get_file_size(message, media_type)
         
@@ -225,7 +225,8 @@ class SessionManager:
         try:
             downloaded_path = await client.download_media(
                 message=message,
-                file_name=str(dest_path)
+                file_name=str(dest_path),
+                progress=progress_callback
             )
         except FloodWait as e:
             raise UserbotError(f"Yuklash cheklandi. {e.value} s kuting.") from e
