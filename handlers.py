@@ -43,6 +43,7 @@ from userbot import (
     MediaTooLargeError,
     NoMediaError,
 )
+from web.storage import add_log, is_user_banned
 
 # ─── Router sozlamasi ────────────────────────────────────────────────────────
 
@@ -128,9 +129,9 @@ async def handle_link(message: Message) -> None:
     text      = message.text or ""
 
     # ── 1. Ruxsatni tekshirish ─────────────────────────────────────────────
-    if not _is_allowed(user_id):
-        logger.warning(f"🚫 Ruxsatsiz kirish urinishi: {user_id} (@{message.from_user.username})")
-        await message.answer("🚫 Sizda bu botdan foydalanish huquqi yo'q.")
+    if not _is_allowed(user_id) or is_user_banned(user_id):
+        logger.warning(f"🚫 Ruxsatsiz kirish urinishi (yoki ban): {user_id} (@{message.from_user.username})")
+        await message.answer("🚫 Sizda bu botdan foydalanish huquqi yo'q yoki admin tomonidan taqiqlangansiz.")
         return
 
     # ── 2. Havolani tahlil qilish ──────────────────────────────────────────
@@ -181,22 +182,27 @@ async def handle_link(message: Message) -> None:
                 f"✅ Muvaffaqiyatli yuborildi: user={user_id}, "
                 f"fayl={downloaded_path.name}"
             )
+            add_log(user_id, user_name, text, "success")
 
         except AccessDeniedError as e:
             logger.warning(f"AccessDeniedError: {e}")
             await _edit_progress(progress_msg, str(e))
+            add_log(user_id, user_name, text, "error", str(e))
 
         except MessageNotFoundError as e:
             logger.warning(f"MessageNotFoundError: {e}")
             await _edit_progress(progress_msg, str(e))
+            add_log(user_id, user_name, text, "error", str(e))
 
         except NoMediaError as e:
             logger.info(f"NoMediaError: {e}")
             await _edit_progress(progress_msg, str(e))
+            add_log(user_id, user_name, text, "error", str(e))
 
         except MediaTooLargeError as e:
             logger.warning(f"MediaTooLargeError: {e}")
             await _edit_progress(progress_msg, str(e))
+            add_log(user_id, user_name, text, "error", str(e))
 
         except UserbotError as e:
             logger.error(f"UserbotError: {e}")
@@ -204,6 +210,7 @@ async def handle_link(message: Message) -> None:
                 progress_msg,
                 f"⚠️ Userbot xatosi:\n{e}\n\nQayta urinib ko'ring."
             )
+            add_log(user_id, user_name, text, "error", str(e))
 
         except TelegramNetworkError as e:
             logger.error(f"TelegramNetworkError (yuborishda): {e}", exc_info=True)
@@ -211,6 +218,7 @@ async def handle_link(message: Message) -> None:
                 progress_msg,
                 "🌐 Tarmoq xatosi yuz berdi. Biroz kutib, qayta urinib ko'ring."
             )
+            add_log(user_id, user_name, text, "error", "Network Error")
 
         except TelegramAPIError as e:
             logger.error(f"TelegramAPIError (yuborishda): {e}", exc_info=True)
@@ -218,6 +226,7 @@ async def handle_link(message: Message) -> None:
                 progress_msg,
                 f"📡 Telegram xatosi: {e.message}\n\nQayta urinib ko'ring."
             )
+            add_log(user_id, user_name, text, "error", f"API Error: {e.message}")
 
         except Exception as e:
             logger.exception(f"Kutilmagan xato: {e}")
@@ -226,6 +235,7 @@ async def handle_link(message: Message) -> None:
                 "💥 Kutilmagan xato yuz berdi.\n"
                 "Administrator bilan bog'laning yoki qayta urinib ko'ring."
             )
+            add_log(user_id, user_name, text, "error", str(e))
 
         finally:
             # ── 7. Disk tozalash — SHART! ─────────────────────────────────

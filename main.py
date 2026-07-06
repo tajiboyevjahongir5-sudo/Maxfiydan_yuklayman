@@ -26,6 +26,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import config
 from handlers import router
 from userbot import userbot
+import os
+import uvicorn
+from web.app import app as web_app
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +129,11 @@ async def main() -> None:
     _setup_signal_handlers(loop)
 
     # Polling ni boshlash
-    # skip_updates=True — Bot o'chiq turganida kelgan xabarlarni o'tkazib yuborish
+    # Web serverni orqa fonda ishga tushirish
+    web_config = uvicorn.Config(web_app, host=os.getenv("WEB_HOST", "0.0.0.0"), port=int(os.getenv("WEB_PORT", "8080")))
+    server = uvicorn.Server(web_config)
+    asyncio.create_task(server.serve())
+    
     try:
         await dp.start_polling(
             bot,
