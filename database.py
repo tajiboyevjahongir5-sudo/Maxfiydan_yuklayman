@@ -142,6 +142,13 @@ async def init_db():
     """Barcha jadvallarni yaratadi."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+    from sqlalchemy import text
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("ALTER TABLE bot_settings ADD COLUMN force_channels TEXT DEFAULT '[]'"))
+    except Exception:
+        pass
 
 async def get_settings() -> Optional["BotSettings"]:
     """Bot sozlamalarini bazadan oladi."""
