@@ -91,6 +91,8 @@ class UserTariff(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     tariff_id: Mapped[int] = mapped_column(Integer, ForeignKey("tariffs.id", ondelete="CASCADE"))
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    
+    tariff: Mapped["Tariff"] = relationship()
 
 
 class Payment(Base):
