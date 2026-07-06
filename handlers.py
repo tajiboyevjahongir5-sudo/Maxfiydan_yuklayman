@@ -82,10 +82,10 @@ async def cmd_start(message: Message) -> None:
     # Railway bergan domain yoki localhost
     domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
     if domain:
-        url = f"https://{domain}/"
+        url = f"https://{domain}/user-dashboard"
     else:
         # Default fallback
-        url = os.getenv("WEBAPP_URL", "https://maxfiydanyuklayman-production.up.railway.app/")
+        url = os.getenv("WEBAPP_URL", "https://maxfiydanyuklayman-production.up.railway.app/user-dashboard")
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -182,11 +182,21 @@ async def handle_link(message: Message) -> None:
     user_name = message.from_user.first_name or str(user_id)
     text      = message.text or ""
 
-    # ── 1. Ruxsatni tekshirish ─────────────────────────────────────────────
-    if not _is_allowed(user_id) or is_user_banned(user_id):
-        logger.warning(f"🚫 Ruxsatsiz kirish urinishi (yoki ban): {user_id} (@{message.from_user.username})")
-        await message.answer("🚫 Sizda bu botdan foydalanish huquqi yo'q yoki admin tomonidan taqiqlangansiz.")
-        return
+    # ── 1. Ruxsatni DB orqali tekshirish ──────────────────────────────────────
+    from database import async_session, User, DownloadHistory
+    from sqlalchemy import select
+
+    async with async_session() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        db_user = result.scalar_one_or_none()
+        
+        if not db_user:
+            await message.answer("Siz ro'yxatdan o'tmagansiz. Iltimos, /start orqali tizimga kiring.")
+            return
+            
+        if db_user.is_banned:
+            await message.answer("🚫 Siz admin tomonidan bloklangansiz.")
+            return
 
     # ── 2. Havolani tahlil qilish ──────────────────────────────────────────
     parsed = parse_telegram_link(text)
@@ -226,7 +236,17 @@ async def handle_link(message: Message) -> None:
         try:
             # ── 5. Userbot orqali media yuklab olish ──────────────────────
             await _edit_progress(progress_msg, "📥 Media serverga yuklanmoqda...")
-            downloaded_path = await userbot.fetch_and_download(parsed)
+            downloaded_path = await userbot.fetch_and_download(user_id, parsed)
+
+            # DB ga tarix yozish
+            async with async_session() as db:
+                history = DownloadHistory(
+                    user_id=user_id,
+                    file_name=downloaded_path.name,
+                    file_size_bytes=downloaded_path.stat().st_size
+                )
+                db.add(history)
+                await db.commit()
 
             # ── 6. Aiogram orqali foydalanuvchiga yuborish ─────────────────
             await _edit_progress(progress_msg, "📤 Sizga yuborilmoqda...")

@@ -6,8 +6,16 @@ from fastapi.responses import FileResponse
 from datetime import timedelta
 from web.auth import Token, create_access_token, get_current_admin, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
 from web.storage import get_stats, get_logs, get_users, toggle_ban_user
+from web.api.sessions import router as sessions_router
+from web.api.auth import router as auth_router
+from web.api.billing import router as billing_router
 
-app = FastAPI(title="Telegram Media Bot Admin Panel")
+app = FastAPI(title="Telegram Media Bot SaaS")
+
+# Include routers
+app.include_router(sessions_router)
+app.include_router(auth_router)
+app.include_router(billing_router)
 
 # Mount static files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -16,6 +24,10 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 @app.get("/")
 async def read_index():
     return FileResponse(os.path.join(static_dir, "index.html"))
+
+@app.get("/user-dashboard")
+async def read_user_dashboard():
+    return FileResponse(os.path.join(static_dir, "user_dashboard.html"))
 
 @app.get("/admin-panel")
 async def read_admin():

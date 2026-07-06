@@ -40,17 +40,22 @@ _shutdown_event = asyncio.Event()
 
 # ─── Ishga tushirish va to'xtatish ──────────────────────────────────────────
 
+from database import init_db
+
 async def on_startup(bot: Bot) -> None:
     """
-    Bot ishga tushganda bir marta chaqiriladi.
-    Userbot ni ishga tushiradi va loglarga info yozadi.
+    Bot ishga tushganda chaqiriladi.
+    Barcha resurslarni (Userbot, xotira, db) tayyorlaydi.
     """
     logger.info("=" * 60)
-    logger.info("  Telegram Media Bot ishga tushmoqda")
-    logger.info("=" * 60)
+    logger.info("🚀 Bot ishga tushmoqda...")
 
-    # Pyrogram userbot ni ishga tushirish
-    await userbot.start()
+    # Bazani tayyorlash
+    logger.info("🗄 Ma'lumotlar bazasi tayyorlanmoqda...")
+    await init_db()
+
+    # Pyrogram userbot ni ishga tushirish (SessionManager)
+    await userbot.start_all()
 
     # Bot ma'lumotlarini olish
     me = await bot.get_me()
@@ -73,8 +78,8 @@ async def on_shutdown(bot: Bot) -> None:
     """
     logger.info("🛑 Bot to'xtatilmoqda...")
 
-    # Pyrogram clientini yopish
-    await userbot.stop()
+    # Pyrogram sessiyalarini yopish
+    await userbot.stop_all()
 
     # Aiogram session ni yopish
     await bot.session.close()
@@ -136,7 +141,7 @@ async def main() -> None:
     asyncio.create_task(server.serve())
     
     try:
-        # Eski webhooklarni o'chirish (agar avval ulab qo'yilgan bo'lsa, polling ishlamaydi)
+        # Eski webhooklarni o'chirish
         await bot.delete_webhook(drop_pending_updates=True)
         
         # Polling boshlash
@@ -148,9 +153,7 @@ async def main() -> None:
         logger.critical(f"💥 Polling da kritik xato: {e}", exc_info=True)
         raise
     finally:
-        # Agar polling ichida xato bo'lsa, userbot ham to'xtatilishi kerak
-        if userbot._client and userbot._client.is_connected:
-            await userbot.stop()
+        await userbot.stop_all()
 
 
 # ─── Entry point ─────────────────────────────────────────────────────────────

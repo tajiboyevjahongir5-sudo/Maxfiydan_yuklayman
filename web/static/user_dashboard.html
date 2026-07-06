@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS Dashboard</title>
+    <!-- Tailwind CSS (CDN for fast development as requested) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Telegram WebApp JS -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #0f172a;
+            --tg-theme-text-color: #f8fafc;
+            --tg-theme-button-color: #3b82f6;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #1e293b;
+            --tg-theme-hint-color: #94a3b8;
+        }
+
+        body {
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .primary-btn {
+            background-color: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        
+        .primary-btn:active {
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+
+        .secondary-bg {
+            background-color: var(--tg-theme-secondary-bg-color);
+        }
+        
+        .hint-text {
+            color: var(--tg-theme-hint-color);
+        }
+
+        /* Fade transition for Vue */
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<div id="app" class="pb-20">
+    <!-- Header -->
+    <header class="p-4 flex justify-between items-center glass-panel sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg">
+                {{ user.firstName ? user.firstName.charAt(0) : 'U' }}
+            </div>
+            <div>
+                <h2 class="font-bold text-lg leading-tight">{{ user.firstName || 'User' }}</h2>
+                <p class="text-xs hint-text">ID: {{ user.id || 'N/A' }}</p>
+            </div>
+        </div>
+        <div>
+            <span v-if="sessionActive" class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">🟢 Ulangan</span>
+            <span v-else class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full border border-red-500/30">🔴 Ulanmagan</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="p-4 relative">
+        <transition name="fade" mode="out-in">
+            <!-- TAB: DASHBOARD -->
+            <div v-if="activeTab === 'dashboard'" key="dashboard" class="space-y-4">
+                
+                <!-- Connect Account Banner -->
+                <div v-if="!sessionActive" class="glass-panel p-5 rounded-2xl border-l-4 border-l-blue-500">
+                    <h3 class="text-xl font-bold mb-2">Akkauntni ulang!</h3>
+                    <p class="text-sm hint-text mb-4">Media yuklab olish uchun avval shaxsiy Telegram akkauntingizni botga ulashingiz kerak.</p>
+                    <button @click="activeTab = 'session'" class="primary-btn w-full py-3 rounded-xl font-semibold shadow-lg shadow-blue-500/30">
+                        Hozir ulash
+                    </button>
+                </div>
+
+                <!-- Tariff Status -->
+                <div class="glass-panel p-5 rounded-2xl relative overflow-hidden">
+                    <div class="absolute -right-10 -top-10 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl"></div>
+                    <h3 class="text-sm uppercase tracking-wider hint-text mb-1">Joriy Tarif</h3>
+                    <div class="flex justify-between items-end mb-3">
+                        <h2 class="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">{{ currentTariff.name }}</h2>
+                        <span class="text-sm">{{ currentTariff.daysLeft }} kun qoldi</span>
+                    </div>
+                    
+                    <div class="space-y-1 mb-2">
+                        <div class="flex justify-between text-xs">
+                            <span>Limit (GB)</span>
+                            <span>{{ (currentTariff.usedGb).toFixed(1) }} / {{ currentTariff.totalGb }} GB</span>
+                        </div>
+                        <div class="w-full bg-gray-700/50 rounded-full h-2">
+                            <div class="bg-gradient-to-r from-blue-400 to-purple-500 h-2 rounded-full" :style="{ width: tariffProgress + '%' }"></div>
+                        </div>
+                    </div>
+                    <button @click="activeTab = 'pricing'" class="mt-3 text-sm text-blue-400 hover:text-blue-300 font-medium">Tarifni yangilash →</button>
+                </div>
+
+                <!-- History -->
+                <div>
+                    <h3 class="font-bold text-lg mb-3 mt-6">Oxirgi Yuklamalar</h3>
+                    <div v-if="history.length === 0" class="text-center py-8 secondary-bg rounded-2xl">
+                        <span class="text-4xl mb-2 block">📭</span>
+                        <p class="hint-text text-sm">Hozircha hech narsa yuklanmagan</p>
+                    </div>
+                    <div v-else class="space-y-2">
+                        <div v-for="item in history" :key="item.id" class="secondary-bg p-3 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <div class="w-10 h-10 rounded bg-blue-500/20 flex items-center justify-center flex-shrink-0 text-xl">
+                                    {{ item.icon }}
+                                </div>
+                                <div class="truncate">
+                                    <h4 class="font-medium text-sm truncate">{{ item.name }}</h4>
+                                    <p class="text-xs hint-text">{{ item.date }}</p>
+                                </div>
+                            </div>
+                            <div class="text-xs font-medium whitespace-nowrap pl-2">
+                                {{ item.size }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: SESSION MANAGER -->
+            <div v-else-if="activeTab === 'session'" key="session" class="space-y-4">
+                <h2 class="text-2xl font-bold mb-2">Akkaunt ulanishi</h2>
+                
+                <div v-if="sessionActive" class="glass-panel p-6 rounded-2xl text-center">
+                    <div class="w-20 h-20 mx-auto bg-green-500/20 text-green-400 rounded-full flex items-center justify-center text-4xl mb-4">
+                        ✓
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Sessiya faol</h3>
+                    <p class="text-sm hint-text mb-6">Sizning akkauntingiz muvaffaqiyatli ulangan. Bot yopiq kanallardan media yuklashga tayyor.</p>
+                    <button @click="logout" class="w-full py-3 rounded-xl font-semibold bg-red-500/20 text-red-500 hover:bg-red-500/30 transition">
+                        Akkauntdan chiqish (Log out)
+                    </button>
+                </div>
+                
+                <div v-else class="glass-panel p-5 rounded-2xl">
+                    <div v-if="authStep === 'phone'">
+                        <p class="text-sm hint-text mb-4">Siz botga yopiq kanallardan fayl olishi uchun ruxsat bermoqdasiz. Telefon raqamingizni xalqaro formatda kiriting (+998...).</p>
+                        <input v-model="phoneNumber" type="tel" placeholder="+998901234567" class="w-full p-3 rounded-xl secondary-bg border border-gray-600 focus:border-blue-500 outline-none mb-4 text-white">
+                        <button @click="sendCode" :disabled="isLoading" class="primary-btn w-full py-3 rounded-xl font-semibold flex justify-center items-center">
+                            <span v-if="isLoading" class="animate-spin mr-2">⚙️</span>
+                            {{ isLoading ? 'Yuborilmoqda...' : 'Kodni olish' }}
+                        </button>
+                    </div>
+                    
+                    <div v-else-if="authStep === 'code'">
+                        <p class="text-sm hint-text mb-4">Telegram ilovangizga borgan 5 xonali kodni kiriting.</p>
+                        <input v-model="authCode" type="text" placeholder="12345" class="w-full p-3 rounded-xl secondary-bg border border-gray-600 focus:border-blue-500 outline-none mb-4 text-white text-center tracking-[0.5em] font-mono text-xl">
+                        <button @click="verifyCode" :disabled="isLoading" class="primary-btn w-full py-3 rounded-xl font-semibold flex justify-center items-center">
+                            <span v-if="isLoading" class="animate-spin mr-2">⚙️</span>
+                            {{ isLoading ? 'Tekshirilmoqda...' : 'Tasdiqlash' }}
+                        </button>
+                        <button @click="authStep = 'phone'" class="w-full py-3 mt-2 text-sm hint-text">Orqaga</button>
+                    </div>
+
+                    <div v-else-if="authStep === 'password'">
+                        <p class="text-sm hint-text mb-4">Akkauntingiz 2 bosqichli autentifikatsiya (2FA) bilan himoyalangan. Parolni kiriting.</p>
+                        <input v-model="authPassword" type="password" placeholder="Parol" class="w-full p-3 rounded-xl secondary-bg border border-gray-600 focus:border-blue-500 outline-none mb-4 text-white">
+                        <button @click="verifyPassword" :disabled="isLoading" class="primary-btn w-full py-3 rounded-xl font-semibold flex justify-center items-center">
+                            <span v-if="isLoading" class="animate-spin mr-2">⚙️</span>
+                            {{ isLoading ? 'Tekshirilmoqda...' : 'Kirish' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: PRICING -->
+            <div v-else-if="activeTab === 'pricing'" key="pricing" class="space-y-4">
+                <h2 class="text-2xl font-bold mb-2">Tariflar</h2>
+                <p class="text-sm hint-text mb-4">O'zingizga mos tarifni tanlang. To'lov Click yoki Payme orqali avtomatik amalga oshadi.</p>
+
+                <div v-for="tariff in tariffs" :key="tariff.id" class="glass-panel p-5 rounded-2xl relative" :class="{'border-blue-500': tariff.id === currentTariff.id}">
+                    <div v-if="tariff.id === currentTariff.id" class="absolute -top-3 right-4 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase">Faol</div>
+                    
+                    <h3 class="text-xl font-bold">{{ tariff.name }}</h3>
+                    <div class="text-2xl font-bold my-2">{{ tariff.price.toLocaleString() }} <span class="text-sm font-normal hint-text">so'm</span></div>
+                    
+                    <ul class="text-sm hint-text space-y-2 mb-4 mt-4">
+                        <li class="flex items-center gap-2"><span>✔️</span> Limit: {{ tariff.maxGb }} GB media</li>
+                        <li class="flex items-center gap-2"><span>✔️</span> Muddat: {{ tariff.days }} kun</li>
+                        <li class="flex items-center gap-2"><span>✔️</span> Maks fayl hajmi: {{ tariff.maxFileSize }} GB</li>
+                    </ul>
+
+                    <button @click="buyTariff(tariff.id)" v-if="tariff.id !== currentTariff.id" class="primary-btn w-full py-2.5 rounded-xl font-semibold">
+                        Sotib olish
+                    </button>
+                    <button v-else disabled class="w-full py-2.5 rounded-xl font-semibold bg-gray-600/30 text-gray-400 cursor-not-allowed">
+                        Joriy tarif
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB: SETTINGS -->
+            <div v-else-if="activeTab === 'settings'" key="settings" class="space-y-4">
+                <h2 class="text-2xl font-bold mb-4">Sozlamalar</h2>
+                
+                <div class="glass-panel p-5 rounded-2xl space-y-5">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-medium">Video siqish</h4>
+                            <p class="text-xs hint-text">Yuklangan videolarni kichik hajmda jo'natish</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" v-model="settings.autoCompress" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                        </label>
+                    </div>
+                    
+                    <div class="h-px w-full bg-gray-700/50"></div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-medium">Saved Messages</h4>
+                            <p class="text-xs hint-text">Fayllarni to'g'ridan-to'g'ri Saqlangan xabarlarga yuborish</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" v-model="settings.saveToSaved" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                        </label>
+                    </div>
+                </div>
+                <button @click="saveSettings" class="primary-btn w-full py-3 rounded-xl font-semibold mt-4">Saqlash</button>
+            </div>
+        </transition>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 w-full glass-panel border-t border-gray-700/50 flex justify-around p-2 pb-6 z-50">
+        <button @click="activeTab = 'dashboard'" class="flex flex-col items-center p-2 rounded-xl w-16 transition-colors" :class="activeTab === 'dashboard' ? 'text-blue-400' : 'hint-text'">
+            <span class="text-xl mb-1">📊</span>
+            <span class="text-[10px] font-medium">Asosiy</span>
+        </button>
+        <button @click="activeTab = 'session'" class="flex flex-col items-center p-2 rounded-xl w-16 transition-colors" :class="activeTab === 'session' ? 'text-blue-400' : 'hint-text'">
+            <span class="text-xl mb-1">🔌</span>
+            <span class="text-[10px] font-medium">Ulanish</span>
+        </button>
+        <button @click="activeTab = 'pricing'" class="flex flex-col items-center p-2 rounded-xl w-16 transition-colors" :class="activeTab === 'pricing' ? 'text-blue-400' : 'hint-text'">
+            <span class="text-xl mb-1">💳</span>
+            <span class="text-[10px] font-medium">Tarif</span>
+        </button>
+        <button @click="activeTab = 'settings'" class="flex flex-col items-center p-2 rounded-xl w-16 transition-colors" :class="activeTab === 'settings' ? 'text-blue-400' : 'hint-text'">
+            <span class="text-xl mb-1">⚙️</span>
+            <span class="text-[10px] font-medium">Sozlama</span>
+        </button>
+    </nav>
+</div>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                tg: window.Telegram.WebApp,
+                user: {},
+                activeTab: 'dashboard',
+                sessionActive: false, // will be fetched from backend
+                
+                // Auth States
+                authStep: 'phone', // phone, code, password
+                phoneNumber: '',
+                authCode: '',
+                phoneHash: '',
+                authPassword: '',
+                isLoading: false,
+                
+                // Mock Data for frontend
+                currentTariff: {
+                    id: 1,
+                    name: 'Boshlang\'ich (Tekin)',
+                    totalGb: 2.0,
+                    usedGb: 0.5,
+                    daysLeft: 'Cheksiz'
+                },
+                tariffs: [
+                    { id: 1, name: 'Boshlang\'ich', price: 0, maxGb: 2, days: 'Cheksiz', maxFileSize: 2 },
+                    { id: 2, name: 'Pro', price: 15000, maxGb: 50, days: 30, maxFileSize: 4 },
+                    { id: 3, name: 'Premium (Cheksiz)', price: 40000, maxGb: 999, days: 30, maxFileSize: 4 }
+                ],
+                history: [
+                    { id: 1, name: 'video_10293.mp4', size: '450 MB', date: 'Bugun, 14:30', icon: '🎥' },
+                    { id: 2, name: 'image_991.jpg', size: '2.4 MB', date: 'Kecha, 09:15', icon: '🖼' }
+                ],
+                settings: {
+                    autoCompress: false,
+                    saveToSaved: true
+                }
+            }
+        },
+        computed: {
+            tariffProgress() {
+                return (this.currentTariff.usedGb / this.currentTariff.totalGb) * 100;
+            }
+        },
+        mounted() {
+            this.tg.expand();
+            this.tg.ready();
+            
+            // Set user data
+            if(this.tg.initDataUnsafe && this.tg.initDataUnsafe.user) {
+                this.user = this.tg.initDataUnsafe.user;
+            } else {
+                // Mock user for testing in browser
+                this.user = { id: 123456, firstName: 'Test User' };
+            }
+            
+            // Sync theme colors
+            const root = document.documentElement;
+            if(this.tg.themeParams.bg_color) root.style.setProperty('--tg-theme-bg-color', this.tg.themeParams.bg_color);
+            if(this.tg.themeParams.text_color) root.style.setProperty('--tg-theme-text-color', this.tg.themeParams.text_color);
+            if(this.tg.themeParams.button_color) root.style.setProperty('--tg-theme-button-color', this.tg.themeParams.button_color);
+            if(this.tg.themeParams.button_text_color) root.style.setProperty('--tg-theme-button-text-color', this.tg.themeParams.button_text_color);
+            if(this.tg.themeParams.secondary_bg_color) root.style.setProperty('--tg-theme-secondary-bg-color', this.tg.themeParams.secondary_bg_color);
+            if(this.tg.themeParams.hint_color) root.style.setProperty('--tg-theme-hint-color', this.tg.themeParams.hint_color);
+        },
+        methods: {
+            async sendCode() {
+                if(!this.phoneNumber) return this.tg.showAlert("Raqamni kiriting");
+                this.isLoading = true;
+                
+                // MOCK API CALL - In real app, call /api/sessions/send_code
+                setTimeout(() => {
+                    this.isLoading = false;
+                    this.phoneHash = "mock_hash";
+                    this.authStep = 'code';
+                }, 1500);
+            },
+            async verifyCode() {
+                if(!this.authCode) return this.tg.showAlert("Kodni kiriting");
+                this.isLoading = true;
+                
+                // MOCK API CALL - Call /api/sessions/verify_code
+                setTimeout(() => {
+                    this.isLoading = false;
+                    // Simulate 2FA required
+                    if(this.authCode === '00000') {
+                        this.authStep = 'password';
+                    } else {
+                        this.sessionActive = true;
+                        this.activeTab = 'dashboard';
+                        this.tg.showAlert("Muvaffaqiyatli ulandi!");
+                    }
+                }, 1500);
+            },
+            async verifyPassword() {
+                if(!this.authPassword) return this.tg.showAlert("Parolni kiriting");
+                this.isLoading = true;
+                
+                setTimeout(() => {
+                    this.isLoading = false;
+                    this.sessionActive = true;
+                    this.activeTab = 'dashboard';
+                    this.tg.showAlert("Muvaffaqiyatli ulandi!");
+                }, 1500);
+            },
+            logout() {
+                this.tg.showConfirm("Akkauntdan chiqishni tasdiqlaysizmi?", (confirm) => {
+                    if(confirm) {
+                        this.sessionActive = false;
+                        this.authStep = 'phone';
+                        this.phoneNumber = '';
+                        this.authCode = '';
+                    }
+                });
+            },
+            buyTariff(id) {
+                const tariff = this.tariffs.find(t => t.id === id);
+                this.tg.showConfirm(`"${tariff.name}" tarifini sotib olishni tasdiqlaysizmi? (Click/Payme simulyatsiyasi)`, (confirm) => {
+                    if(confirm) {
+                        // Mock checkout
+                        this.currentTariff = {
+                            id: tariff.id,
+                            name: tariff.name,
+                            totalGb: tariff.maxGb,
+                            usedGb: 0,
+                            daysLeft: tariff.days
+                        };
+                        this.tg.showAlert("Tarif muvaffaqiyatli xarid qilindi!");
+                        this.activeTab = 'dashboard';
+                    }
+                });
+            },
+            saveSettings() {
+                // Mock API call to save settings
+                this.tg.HapticFeedback.notificationOccurred('success');
+                this.tg.showAlert("Sozlamalar saqlandi!");
+            }
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

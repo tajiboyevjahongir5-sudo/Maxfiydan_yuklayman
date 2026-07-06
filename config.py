@@ -62,6 +62,7 @@ class AppConfig:
     userbot: UserbotConfig
     download_dir: Path
     max_file_size_bytes: int
+    database_url: str
     allowed_users: set[int] = field(default_factory=set)
 
     def __post_init__(self):
@@ -93,6 +94,14 @@ def load_config() -> AppConfig:
     """
     max_mb = int(os.getenv("MAX_FILE_SIZE_MB", "2000"))
     
+    # Agar DATABASE_URL ko'rsatilmagan bo'lsa, lokal SQLite ishlatiladi
+    db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///storage.db")
+    # Railway'ning postgres:// formatini postgresql+asyncpg:// formatiga o'zgartirish
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        
     return AppConfig(
         bot=BotConfig(
             token=os.getenv("BOT_TOKEN", ""),
@@ -104,6 +113,7 @@ def load_config() -> AppConfig:
         ),
         download_dir=Path(os.getenv("DOWNLOAD_DIR", "./downloads")),
         max_file_size_bytes=max_mb * 1024 * 1024,  # MB → Bayt
+        database_url=db_url,
         allowed_users=_parse_allowed_users(
             os.getenv("ALLOWED_USERS", "")
         ),
