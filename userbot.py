@@ -101,6 +101,18 @@ class SessionManager:
             await client.start()
             self.clients[user_id] = client
             me = await client.get_me()
+
+            # Stealth: last seen va online holatni yashirish
+            try:
+                from pyrogram import raw
+                await client.invoke(raw.functions.account.SetPrivacy(
+                    key=raw.types.InputPrivacyKeyStatusTimestamp(),
+                    rules=[raw.types.InputPrivacyValueDisallowAll()]
+                ))
+                logger.info(f"🥷 Stealth: @{me.username or me.first_name} uchun online yashirildi")
+            except Exception:
+                pass  # Stealth sozlash ixtiyoriy — xato bo'lsa davom etadi
+
             logger.info(f"✅ Userbot (ID: {user_id}) ulandi: @{me.username or me.first_name}")
 
     async def stop_all(self) -> None:
@@ -147,6 +159,11 @@ class SessionManager:
                     raise MessageNotFoundError("Xabar topilmadi yoki o'chirilgan.")
                 if not has_media(message):
                     raise NoMediaError("Xabarda yuklanadigan media yo'q.")
+
+                # Stealth: xabarni o'qildi deb belgilamaslik
+                # Pyrogram get_messages() avtomatik o'qimaydi, shuning uchun
+                # read_chat_history() chaqirmaymiz — bu yetarli
+
                 return message
 
             except FloodWait as e:
