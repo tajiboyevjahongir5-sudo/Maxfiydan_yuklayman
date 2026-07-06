@@ -20,7 +20,7 @@ import signal
 import sys
 
 import uvicorn
-from aiogram import Dispatcher
+from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
