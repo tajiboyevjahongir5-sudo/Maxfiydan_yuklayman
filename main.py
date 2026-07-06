@@ -128,9 +128,10 @@ async def main() -> None:
     loop = asyncio.get_running_loop()
     _setup_signal_handlers(loop)
 
-    # Polling ni boshlash
     # Web serverni orqa fonda ishga tushirish
-    web_config = uvicorn.Config(web_app, host=os.getenv("WEB_HOST", "0.0.0.0"), port=int(os.getenv("WEB_PORT", "8080")))
+    # Railway PORT env ni ishlatadi, yo'q bo'lsa WEB_PORT, keyin 8080
+    port = int(os.getenv("PORT") or os.getenv("WEB_PORT") or "8080")
+    web_config = uvicorn.Config(web_app, host="0.0.0.0", port=port)
     server = uvicorn.Server(web_config)
     asyncio.create_task(server.serve())
     
