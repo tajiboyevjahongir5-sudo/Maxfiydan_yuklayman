@@ -12,7 +12,7 @@
             --border:rgba(255,255,255,.07);--primary:#3b82f6;--danger:#ef4444;
             --success:#22c55e;--warn:#f59e0b;--text:#f1f5f9;--muted:#64748b;
         }
-        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;overflow-x:hidden}
 
         /* ── Login ── */
         #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
@@ -21,15 +21,28 @@
         .login-box p{color:var(--muted);font-size:.875rem;margin-bottom:2rem}
         
         /* ── Sidebar ── */
-        aside{width:220px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:1.5rem 0;position:fixed;height:100vh;top:0;left:0}
+        aside{
+            width:240px;
+            min-width:240px;
+            flex-shrink:0;
+            background:var(--sidebar);
+            border-right:1px solid var(--border);
+            display:flex;
+            flex-direction:column;
+            padding:1.5rem 0;
+            position:sticky;
+            top:0;
+            height:100vh;
+            overflow-y:auto;
+        }
         .brand{padding:0 1.5rem 1.5rem;font-size:1rem;font-weight:700;display:flex;align-items:center;gap:.6rem;border-bottom:1px solid var(--border)}
-        nav a{display:flex;align-items:center;gap:.75rem;padding:.7rem 1.5rem;font-size:.875rem;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;border-left:3px solid transparent}
+        nav a{display:flex;align-items:center;gap:.75rem;padding:.7rem 1.5rem;font-size:.875rem;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none;border-left:3px solid transparent;white-space:nowrap}
         nav a:hover{color:var(--text);background:rgba(255,255,255,.04)}
         nav a.active{color:var(--primary);background:rgba(59,130,246,.08);border-left-color:var(--primary)}
-        .logout-link{margin-top:auto;padding:0 1.5rem 1rem}
+        .logout-link{margin-top:auto;padding:0 1rem 1rem}
         
         /* ── Main ── */
-        main{margin-left:220px;flex:1;padding:2rem;min-height:100vh}
+        main{flex:1;padding:2rem;min-height:100vh;overflow-x:auto}
         h2{font-size:1.4rem;font-weight:700;margin-bottom:1.5rem}
         h3{font-size:1rem;font-weight:600;margin-bottom:1rem}
         
@@ -37,8 +50,8 @@
         .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:1.5rem}
         .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
         .stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem}
-        .stat .val{font-size:2rem;font-weight:700;margin-top:.25rem}
-        .stat .lbl{font-size:.8rem;color:var(--muted)}
+        .stat .val{font-size:2rem;font-weight:700;margin-top:.5rem;line-height:1.2;min-height:2.5rem}
+        .stat .lbl{font-size:.8rem;color:var(--muted);font-weight:500}
         
         /* ── Tables ── */
         .tbl-wrap{overflow-x:auto}
@@ -75,11 +88,13 @@
         /* ── Section hide ── */
         .section{display:none}.section.active{display:block}
 
-        @media(max-width:900px){
-            aside{width:60px}.brand span{display:none}
-            nav a span{display:none}nav a{justify-content:center;padding:.7rem}
-            main{margin-left:60px}
-            .stats{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}
+        @media(max-width:1100px){
+            .stats{grid-template-columns:1fr 1fr}
+        }
+        @media(max-width:700px){
+            .form-row{grid-template-columns:1fr}
+            aside{width:200px;min-width:200px}
+            main{padding:1rem}
         }
     </style>
 </head>
@@ -353,30 +368,32 @@ function toast(msg = '✅ Muvaffaqiyatli!', color = '#22c55e') {
 async function loadDashboard() {
     const d = await api('/api/stats');
     if (!d) return;
-    document.getElementById('st-total').textContent = d.total_requests ?? '—';
-    document.getElementById('st-ok').textContent = d.success_count ?? '—';
-    document.getElementById('st-err').textContent = d.error_count ?? '—';
-    document.getElementById('st-active').textContent = d.active_users_24h ?? '—';
+    document.getElementById('st-total').textContent  = d.total_requests  ?? 0;
+    document.getElementById('st-ok').textContent     = d.success         ?? 0;
+    document.getElementById('st-err').textContent    = d.errors          ?? 0;
+    document.getElementById('st-active').textContent = d.active_users    ?? 0;
 }
 
 // ── Users ──────────────────────────────────────────────────────────────────
 async function loadUsers() {
-    const users = await api('/api/users');
+    const data = await api('/api/users');
     const tbody = document.getElementById('users-body');
-    if (!users) return;
+    if (!data) return;
+    // API dict qaytaradi: { user_id: {...} } — arrayga o'tkazamiz
+    const users = Object.entries(data).map(([id, u]) => ({ id, ...u }));
     tbody.innerHTML = users.length ? users.map(u => `
         <tr>
             <td><code style="font-size:.8rem;color:#94a3b8">${u.id}</code></td>
-            <td>${u.first_name || '—'}</td>
-            <td>${u.username ? '@'+u.username : '—'}</td>
-            <td>${u.downloads_count ?? 0}</td>
-            <td>${u.is_banned
+            <td>${u.name || '—'}</td>
+            <td>—</td>
+            <td>${u.requests ?? 0}</td>
+            <td>${u.banned
                 ? '<span class="badge badge-red">Bloklangan</span>'
                 : '<span class="badge badge-green">Faol</span>'}</td>
             <td>
-                <button class="btn btn-sm ${u.is_banned ? 'btn-primary' : 'btn-danger'}"
-                    onclick="toggleBan(${u.id}, this)">
-                    ${u.is_banned ? 'Qulfdan chiq.' : 'Bloklash'}
+                <button class="btn btn-sm ${u.banned ? 'btn-primary' : 'btn-danger'}"
+                    onclick="toggleBan('${u.id}', this)">
+                    ${u.banned ? 'Qulfdan chiq.' : 'Bloklash'}
                 </button>
             </td>
         </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Foydalanuvchilar yo'q</td></tr>`;
@@ -395,13 +412,15 @@ async function loadLogs() {
     if (!logs) return;
     tbody.innerHTML = logs.length ? logs.map(l => `
         <tr>
-            <td style="white-space:nowrap;color:var(--muted);font-size:.8rem">${new Date(l.timestamp).toLocaleString()}</td>
-            <td>${l.user_name || l.user_id}</td>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.url||''}">${l.url || '—'}</td>
+            <td style="white-space:nowrap;color:var(--muted);font-size:.8rem">${
+                l.time ? new Date(l.time * 1000).toLocaleString('uz-UZ') : '—'
+            }</td>
+            <td>${l.user_name || l.user_id || '—'}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.link||''}">${l.link || '—'}</td>
             <td>${l.status === 'success'
                 ? '<span class="badge badge-green">OK</span>'
                 : '<span class="badge badge-red">Xato</span>'}</td>
-            <td style="color:var(--danger);font-size:.8rem">${l.error || ''}</td>
+            <td style="color:var(--danger);font-size:.8rem">${l.error_msg || ''}</td>
         </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Tarix bo'sh</td></tr>`;
 }
 
