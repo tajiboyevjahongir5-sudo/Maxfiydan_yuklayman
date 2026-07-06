@@ -125,3 +125,38 @@ async def update_my_settings(settings: UserSettings, user_id: int = Depends(get_
         await db.commit()
         
         return {"status": "success"}
+
+class DownloadRequest(BaseModel):
+    link: str
+
+@router.post("/download")
+async def request_download(req: DownloadRequest, user_id: int = Depends(get_current_user_id)):
+    """Web app orqali yuborilgan havolani qabul qilib, yuklash jarayonini boshlaydi."""
+    from bot_instance import bot
+    from aiogram.types import Message, User as AiogramUser, Chat
+    from datetime import datetime
+    import asyncio
+    from handlers import handle_link
+    from database import async_session, User
+    from sqlalchemy import select
+    
+    # Ruxsatni tekshirish
+    async with async_session() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user or user.is_banned:
+            raise HTTPException(status_code=403, detail="Ruxsat etilmagan foydalanuvchi")
+    
+    # Fake aiogram message
+    fake_message = Message(
+        message_id=0,
+        date=datetime.now(),
+        chat=Chat(id=user_id, type="private"),
+        from_user=AiogramUser(id=user_id, is_bot=False, first_name=user.first_name),
+        text=req.link
+    ).as_(bot)
+    
+    # Run handle_link in background
+    asyncio.create_task(handle_link(fake_message))
+    
+    return {"status": "success"}

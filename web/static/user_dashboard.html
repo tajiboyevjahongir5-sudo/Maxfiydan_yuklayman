@@ -90,6 +90,19 @@
                 </div>
                 <div v-else class="glass p-5 rounded-2xl animate-pulse h-28"></div>
 
+                <!-- Yuklash uchun havola -->
+                <div class="glass p-5 rounded-2xl">
+                    <h3 class="font-bold text-base mb-3 mt-1">Media yuklash</h3>
+                    <div class="flex gap-2">
+                        <input v-model="downloadLink" type="url" placeholder="https://t.me/c/..."
+                            class="flex-1 p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                        <button @click="startDownload" :disabled="!downloadLink || isDownloading" class="btn-primary px-5 rounded-xl font-semibold transition">
+                            <span v-if="isDownloading">⏳</span>
+                            <span v-else>Yuklash</span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Oxirgi yuklamalar -->
                 <div>
                     <h3 class="font-bold text-base mb-3 mt-2">Oxirgi Yuklamalar</h3>
@@ -349,8 +362,37 @@ createApp({
             polling: false,
 
             // Settings
-            settings: { autoCompress: false, saveToSaved: false }
+            settings: { autoCompress: false, saveToSaved: false },
+
+            // Download
+            downloadLink: '',
+            isDownloading: false
         };
+    },
+    methods: {
+        async startDownload() {
+            if (!this.downloadLink) return;
+            this.isDownloading = true;
+            try {
+                const res = await fetch('/api/user/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+                    body: JSON.stringify({ link: this.downloadLink })
+                });
+                if (res.ok) {
+                    this.tg?.showAlert("Yuklash boshlandi! Bot orqali jarayonni kuzatishingiz mumkin.");
+                    setTimeout(() => this.tg?.close(), 1500);
+                } else {
+                    const d = await res.json();
+                    this.tg?.showAlert(d.detail || "Xatolik yuz berdi");
+                }
+            } catch (err) {
+                this.tg?.showAlert("Serverga ulanishda xatolik!");
+            } finally {
+                this.isDownloading = false;
+                this.downloadLink = "";
+            }
+        }
     },
     computed: {
         tariffPct() {
