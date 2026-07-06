@@ -137,7 +137,8 @@
             tbody tr { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1rem; padding: 1rem; position: relative; }
             tbody td { padding: .4rem 0; border: none; display: flex; flex-direction: column; font-size: .9rem; }
             tbody td::before { content: attr(data-label); font-size: .75rem; color: var(--muted); text-transform: uppercase; font-weight: 600; margin-bottom: .2rem; }
-            tbody td:last-child { margin-top: .5rem; padding-top: .5rem; border-top: 1px solid rgba(255,255,255,.05); flex-direction: row; justify-content: flex-end; }
+            tbody td:last-child { margin-top: .5rem; padding-top: .75rem; border-top: 1px solid rgba(255,255,255,.05); flex-direction: row; align-items: center; gap: .5rem; flex-wrap: wrap; }
+            tbody td:last-child::before { margin-bottom: 0; margin-right: auto; }
         }
     </style>
 </head>
