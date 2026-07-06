@@ -309,14 +309,7 @@ async function doTelegramLogin() {
         const res = await fetch('/api/auth/telegram', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: tg.initDataUnsafe.user.id,
-                first_name: tg.initDataUnsafe.user.first_name,
-                username: tg.initDataUnsafe.user.username,
-                photo_url: tg.initDataUnsafe.user.photo_url,
-                auth_date: tg.initDataUnsafe.auth_date,
-                hash: tg.initDataUnsafe.hash
-            })
+            body: JSON.stringify({ initData: tg.initData })
         });
 
         if (res.ok) {
