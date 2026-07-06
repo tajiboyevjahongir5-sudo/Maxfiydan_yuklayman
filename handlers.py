@@ -72,19 +72,42 @@ def _is_allowed(user_id: int) -> bool:
 
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
-    """Botni ishga tushirganda salomlashish xabarini yuboradi."""
+    """Botni ishga tushirganda salomlashish xabarini yuboradi va userni bazaga saqlaydi."""
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     from aiogram.types.web_app_info import WebAppInfo
+    from database import async_session, User
+    from sqlalchemy import select
     import os
-    
-    user_name = message.from_user.first_name or "Foydalanuvchi"
-    
+
+    user = message.from_user
+    user_name = user.first_name or "Foydalanuvchi"
+
+    # ── Foydalanuvchini bazaga saqlash (agar mavjud bo'lmasa) ─────────────
+    async with async_session() as db:
+        result = await db.execute(select(User).where(User.id == user.id))
+        db_user = result.scalar_one_or_none()
+
+        if not db_user:
+            new_user = User(
+                id=user.id,
+                first_name=user.first_name or "",
+                username=user.username,
+            )
+            db.add(new_user)
+            await db.commit()
+            logger.info(f"✅ Yangi foydalanuvchi qo'shildi: {user.id} ({user_name})")
+        else:
+            # Ism va username yangilanishi mumkin
+            if db_user.first_name != (user.first_name or ""):
+                db_user.first_name = user.first_name or ""
+                db_user.username = user.username
+                await db.commit()
+
     # Railway bergan domain yoki localhost
     domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
     if domain:
         url = f"https://{domain}/user-dashboard"
     else:
-        # Default fallback
         url = os.getenv("WEBAPP_URL", "https://maxfiydanyuklayman-production.up.railway.app/user-dashboard")
 
     keyboard = InlineKeyboardMarkup(

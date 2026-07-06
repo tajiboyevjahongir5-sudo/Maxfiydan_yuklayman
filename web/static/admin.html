@@ -92,10 +92,23 @@
         @media(max-width:1100px){
             .stats{grid-template-columns:1fr 1fr}
         }
-        @media(max-width:700px){
+        @media(max-width:768px){
+            body { flex-direction: column; }
+            aside {
+                width: 100%; min-width: 100%; height: auto;
+                flex-direction: row; align-items: center;
+                padding: 0; border-right: none; border-bottom: 1px solid var(--border);
+                overflow-x: auto; white-space: nowrap; z-index: 50;
+            }
+            .brand { border-bottom: none; border-right: 1px solid var(--border); padding: 1rem; margin-right: 0.5rem; }
+            nav { display: flex; flex-direction: row; align-items: center; }
+            nav a { padding: 1rem; border-left: none; border-bottom: 3px solid transparent; }
+            nav a.active { border-bottom-color: var(--primary); border-left-color: transparent; }
+            .logout-link { margin-top: 0; margin-left: auto; padding: 1rem; }
+            
             .form-row{grid-template-columns:1fr}
-            aside{width:200px;min-width:200px}
             main{padding:1rem}
+            .stats{grid-template-columns:1fr}
         }
     </style>
 </head>
