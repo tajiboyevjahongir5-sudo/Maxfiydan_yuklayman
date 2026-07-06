@@ -4,9 +4,9 @@ python-dotenv==1.0.1
 aiofiles==23.2.1
 fastapi==0.111.0
 uvicorn==0.30.1
-sqlalchemy==2.0.31
-asyncpg==0.29.0
+sqlalchemy==2.0.36
+asyncpg==0.30.0
 aiosqlite==0.20.0
-greenlet==3.0.3
+greenlet==3.1.1
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.9
