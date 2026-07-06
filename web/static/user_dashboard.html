@@ -328,6 +328,20 @@
             <span class="text-[10px] font-medium">Sozlama</span>
         </button>
     </nav>
+
+    <!-- Nima uchun nomer ulashim kerak Modal -->
+    <div v-if="showWhyPhone" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="showWhyPhone = false">
+        <div class="glass w-full max-w-sm p-6 rounded-2xl relative shadow-2xl">
+            <h3 class="text-xl font-bold mb-3 flex items-center gap-2">❓ Nega raqam kerak?</h3>
+            <p class="text-sm text-slate-300 leading-relaxed mb-4">
+                Yopiq guruhlar va kanallardan mediani yuklab olish uchun siz avval o'sha guruhga a'zo bo'lgan bo'lishingiz kerak. 
+                Tizim sizning akkauntingiz orqali (Userbot) yopiq kanaldan xabarni oladi va bot orqali sizga qulay qilib yuboradi. 
+                <br><br>
+                <b>Xavfsizlik:</b> Sizning profilingiz faqatgina o'zingiz yuborgan havoladagi mediani yuklab olish uchungina ishlatiladi. Boshqa hech qanday ma'lumotlaringiz o'qilmaydi va serverda saqlanmaydi!
+            </p>
+            <button @click="showWhyPhone = false" class="btn-primary w-full py-3 rounded-xl font-semibold">Tushunarli, yopish</button>
+        </div>
+    </div>
 </div>
 
 <script>
