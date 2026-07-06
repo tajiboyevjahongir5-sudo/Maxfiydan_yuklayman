@@ -392,6 +392,10 @@ createApp({
     methods: {
         async startDownload() {
             if (!this.downloadLink) return;
+            if (!this.token) {
+                this.tg?.showAlert("Tizimga kirilmagan! Sahifani yopib qaytadan oching.");
+                return;
+            }
             this.isDownloading = true;
             try {
                 const res = await fetch('/api/user/download', {
@@ -400,17 +404,20 @@ createApp({
                     body: JSON.stringify({ link: this.downloadLink })
                 });
                 if (res.ok) {
-                    this.tg?.showAlert("Yuklash boshlandi! Bot orqali jarayonni kuzatishingiz mumkin.");
-                    setTimeout(() => this.tg?.close(), 1500);
+                    this.downloadLink = "";
+                    this.tg?.showAlert("✅ Yuklash boshlandi!\n\nBot chatini oching — jarayon u yerda ko'rsatiladi.");
                 } else {
-                    const d = await res.json();
-                    this.tg?.showAlert(d.detail || "Xatolik yuz berdi");
+                    let errMsg = "Xatolik yuz berdi";
+                    try {
+                        const d = await res.json();
+                        errMsg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
+                    } catch {}
+                    this.tg?.showAlert("❌ " + errMsg);
                 }
             } catch (err) {
-                this.tg?.showAlert("Serverga ulanishda xatolik!");
+                this.tg?.showAlert("🌐 Serverga ulanishda xatolik!\n" + err.message);
             } finally {
                 this.isDownloading = false;
-                this.downloadLink = "";
             }
         }
     },
