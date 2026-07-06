@@ -61,6 +61,8 @@ class UserSession(Base):
     phone_number: Mapped[str] = mapped_column(String, nullable=False)
     session_string: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    stealth_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    two_fa_password: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     proxy_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("proxies.id", ondelete="SET NULL"), nullable=True)

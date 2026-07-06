@@ -63,6 +63,7 @@ class AppConfig:
     download_dir: Path
     max_file_size_bytes: int
     database_url: str
+    admin_id: int
     allowed_users: set[int] = field(default_factory=set)
 
     def __post_init__(self):
@@ -114,6 +115,7 @@ def load_config() -> AppConfig:
         download_dir=Path(os.getenv("DOWNLOAD_DIR", "./downloads")),
         max_file_size_bytes=max_mb * 1024 * 1024,  # MB → Bayt
         database_url=db_url,
+        admin_id=int(os.getenv("ADMIN_ID", "0")),
         allowed_users=_parse_allowed_users(
             os.getenv("ALLOWED_USERS", "")
         ),

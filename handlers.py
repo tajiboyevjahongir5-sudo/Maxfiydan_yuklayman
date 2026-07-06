@@ -138,8 +138,8 @@ async def cmd_admin(message: Message) -> None:
     from aiogram.types.web_app_info import WebAppInfo
     import os
 
-    # Ruxsatni tekshirish (faqat ruxsatli yoki hamma ruxsatli bo'lsa)
-    if not _is_allowed(message.from_user.id):
+    # Ruxsatni tekshirish (Faqat admin uchun)
+    if message.from_user.id != config.admin_id:
         await message.answer("🚫 Sizda admin panelga kirish huquqi yo'q.")
         return
 

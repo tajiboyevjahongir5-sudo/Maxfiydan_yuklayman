@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel — Maxfiy Media Bot</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         :root{
@@ -104,14 +105,13 @@
 <div id="login">
     <div class="login-box">
         <h1>🔐 Admin Panel</h1>
-        <p>Maxfiy kalitni (ADMIN_SECRET) kiriting</p>
-        <div style="margin-bottom:1rem">
-            <input type="password" id="pw" placeholder="Maxfiy kalit..." onkeydown="if(event.key==='Enter')doLogin()">
-        </div>
-        <button class="btn btn-primary" style="width:100%;padding:.75rem" onclick="doLogin()">Kirish</button>
-        <p id="login-err" style="color:#ef4444;font-size:.8rem;margin-top:.75rem;display:none">Noto'g'ri kalit!</p>
+        <p>Telegram orqali avtorizatsiya qilinmoqda...</p>
+        <div id="login-spinner" style="margin:2rem 0;font-size:2rem;animation:spin 1s linear infinite">⏳</div>
+        <p id="login-err" style="color:#ef4444;font-size:.8rem;display:none">Sizda admin huquqi yo'q yoki xatolik yuz berdi!</p>
+        <button id="retry-btn" class="btn btn-outline" style="display:none;margin:0 auto" onclick="doTelegramLogin()">Qayta urinish</button>
     </div>
 </div>
+<style>@keyframes spin{100%{transform:rotate(360deg)}}</style>
 
 <!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
 <aside>
@@ -179,8 +179,8 @@
             <h3>Ulangan Sessiyalar</h3>
             <div class="tbl-wrap">
                 <table>
-                    <thead><tr><th>ID</th><th>Foydalanuvchi ID</th><th>Telefon</th><th>Holat</th><th>Amal</th></tr></thead>
-                    <tbody id="sessions-body"><tr><td colspan="5" style="text-align:center;padding:1.5rem;color:var(--muted)">Yuklanmoqda...</td></tr></tbody>
+                    <thead><tr><th>ID</th><th>Foydalanuvchi ID</th><th>Telefon</th><th>Holat</th><th>Yashirin Rejim</th><th>Amal</th></tr></thead>
+                    <tbody id="sessions-body"><tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--muted)">Yuklanmoqda...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -290,22 +290,58 @@
 
 <script>
 let TOKEN = null;
+const tg = window.Telegram?.WebApp;
 
 // ── Login ──────────────────────────────────────────────────────────────────
-async function doLogin() {
-    const pw = document.getElementById('pw').value;
-    const res = await fetch('/token', {
-        method:'POST',
-        headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:`username=admin&password=${encodeURIComponent(pw)}`
-    });
-    if (res.ok) {
-        TOKEN = (await res.json()).access_token;
-        localStorage.setItem('admin_token', TOKEN);
-        document.getElementById('login').style.display = 'none';
-        loadSection('dashboard');
-    } else {
+async function doTelegramLogin() {
+    document.getElementById('login-err').style.display = 'none';
+    document.getElementById('retry-btn').style.display = 'none';
+    document.getElementById('login-spinner').style.display = 'block';
+
+    if (!tg || !tg.initDataUnsafe?.user) {
+        document.getElementById('login-err').textContent = "Telegram orqali kirmadingiz!";
         document.getElementById('login-err').style.display = 'block';
+        document.getElementById('login-spinner').style.display = 'none';
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/auth/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: tg.initDataUnsafe.user.id,
+                first_name: tg.initDataUnsafe.user.first_name,
+                username: tg.initDataUnsafe.user.username,
+                photo_url: tg.initDataUnsafe.user.photo_url,
+                auth_date: tg.initDataUnsafe.auth_date,
+                hash: tg.initDataUnsafe.hash
+            })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            TOKEN = data.access_token;
+            localStorage.setItem('admin_token', TOKEN);
+            
+            // Check if user is admin by making a request to admin stats
+            const checkAdmin = await fetch('/api/stats', { headers: { Authorization: `Bearer ${TOKEN}` } });
+            if (checkAdmin.ok) {
+                document.getElementById('login').style.display = 'none';
+                loadSection('dashboard');
+                if(tg) tg.expand();
+            } else {
+                throw new Error("Sizda admin huquqi yo'q");
+            }
+        } else {
+            throw new Error("Avtorizatsiya xatosi");
+        }
+    } catch (err) {
+        document.getElementById('login-err').textContent = err.message || "Xatolik yuz berdi";
+        document.getElementById('login-err').style.display = 'block';
+        document.getElementById('login-spinner').style.display = 'none';
+        document.getElementById('retry-btn').style.display = 'block';
+        localStorage.removeItem('admin_token');
     }
 }
 
@@ -316,12 +352,21 @@ function logout() {
 }
 
 // Auto-login
-window.onload = () => {
+window.onload = async () => {
+    if(tg) tg.ready();
     const saved = localStorage.getItem('admin_token');
     if (saved) {
         TOKEN = saved;
-        document.getElementById('login').style.display = 'none';
-        loadSection('dashboard');
+        const checkAdmin = await fetch('/api/stats', { headers: { Authorization: `Bearer ${TOKEN}` } });
+        if (checkAdmin.ok) {
+            document.getElementById('login').style.display = 'none';
+            loadSection('dashboard');
+            if(tg) tg.expand();
+        } else {
+            doTelegramLogin();
+        }
+    } else {
+        doTelegramLogin();
     }
     document.getElementById('bc-text').addEventListener('input', function() {
         document.getElementById('bc-preview').innerHTML = this.value || '—';
@@ -438,9 +483,24 @@ async function loadSessions() {
                 ? '<span class="badge badge-green">Faol</span>'
                 : '<span class="badge badge-red">Nofaol</span>'}</td>
             <td>
+                <button class="btn btn-sm ${s.stealth_mode ? 'btn-danger' : 'btn-outline'}" 
+                        style="display:flex;align-items:center;gap:4px"
+                        onclick="toggleStealth(${s.user_id}, this)">
+                    🥷 ${s.stealth_mode ? 'O\'chirish' : 'Yoqish'}
+                </button>
+            </td>
+            <td>
                 <button class="btn btn-sm btn-danger" onclick="deleteSession(${s.id})">O'chirish</button>
             </td>
-        </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Sessiyalar yo'q</td></tr>`;
+        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Sessiyalar yo'q</td></tr>`;
+}
+
+async function toggleStealth(userId, btn) {
+    const res = await api(`/api/admin/users/${userId}/stealth`, { method: 'POST' });
+    if(res) {
+        toast(res.stealth_mode ? '🥷 Yashirin rejim yoqildi!' : 'Yashirin rejim o\'chirildi');
+        loadSessions();
+    }
 }
 
 async function deleteSession(id) {
