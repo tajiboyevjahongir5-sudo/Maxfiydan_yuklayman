@@ -5,6 +5,7 @@ from typing import Optional, Dict
 from config import config
 from database import async_session, UserSession
 from userbot import userbot
+from web.auth import get_current_user_id
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
@@ -25,7 +26,7 @@ class PasswordRequest(BaseModel):
     password: str
 
 @router.post("/send_code")
-async def send_code(req: PhoneRequest):
+async def send_code(req: PhoneRequest, user_id: int = Depends(get_current_user_id)):
     """Telefon raqamiga kod yuboradi."""
     client = Client(
         name=f"temp_{req.phone_number.replace('+', '')}",
@@ -40,7 +41,8 @@ async def send_code(req: PhoneRequest):
         sent_code = await client.send_code(req.phone_number)
         auth_cache[req.phone_number] = {
             "client": client,
-            "phone_code_hash": sent_code.phone_code_hash
+            "phone_code_hash": sent_code.phone_code_hash,
+            "user_id": user_id
         }
         return {"status": "success", "phone_code_hash": sent_code.phone_code_hash}
     except Exception as e:
@@ -49,7 +51,7 @@ async def send_code(req: PhoneRequest):
 
 
 @router.post("/verify_code")
-async def verify_code(req: CodeRequest, user_id: int):
+async def verify_code(req: CodeRequest, user_id: int = Depends(get_current_user_id)):
     """Kodni tasdiqlaydi. Agar 2FA so'rasa, 2FA endpointiga yuboriladi."""
     if req.phone_number not in auth_cache:
         raise HTTPException(status_code=400, detail="Telefon raqam cache da topilmadi. Qaytadan boshlang.")
@@ -86,17 +88,18 @@ async def verify_code(req: CodeRequest, user_id: int):
         return {"status": "success", "message": "Akkaunt muvaffaqiyatli ulandi!"}
         
     except Exception as e:
-        if "SessionPasswordNeeded" in str(type(e)):
+        err_type = str(type(e).__name__)
+        if "SessionPasswordNeeded" in err_type:
             return {"status": "2fa_required", "message": "2 bosqichli parol talab qilinadi."}
         
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/verify_2fa")
-async def verify_2fa(req: PasswordRequest, user_id: int):
+async def verify_2fa(req: PasswordRequest, user_id: int = Depends(get_current_user_id)):
     """2FA parolini tasdiqlaydi."""
     if req.phone_number not in auth_cache:
-        raise HTTPException(status_code=400, detail="Cache topilmadi.")
+        raise HTTPException(status_code=400, detail="Cache topilmadi. Qaytadan boshlang.")
         
     cache = auth_cache[req.phone_number]
     client: Client = cache["client"]
