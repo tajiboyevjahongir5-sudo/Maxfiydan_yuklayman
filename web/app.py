@@ -76,8 +76,9 @@ async def api_logs(limit: int = 50, current_user: str = Depends(get_current_admi
 
 @app.get("/api/users")
 async def api_users(current_user: str = Depends(get_current_admin)):
-    from database import async_session, User, DownloadHistory
+    from database import async_session, User, DownloadHistory, UserSession, UserTariff
     from sqlalchemy import select, func
+    from datetime import datetime
     async with async_session() as db:
         # Get users
         result = await db.execute(select(User))
@@ -90,12 +91,23 @@ async def api_users(current_user: str = Depends(get_current_admin)):
         )
         counts = {row[0]: row[1] for row in counts_res.all()}
         
+        # Get sessions for phone numbers
+        sessions_res = await db.execute(select(UserSession))
+        sessions = {s.user_id: s.phone_number for s in sessions_res.scalars().all() if s.is_active}
+        
+        # Get active tariffs
+        tariffs_res = await db.execute(select(UserTariff).where(UserTariff.expires_at > datetime.utcnow()))
+        active_tariffs = {t.user_id: t.expires_at for t in tariffs_res.scalars().all()}
+        
         users_dict = {}
         for u in users_db:
             users_dict[str(u.id)] = {
                 "name": u.first_name,
+                "username": u.username,
                 "requests": counts.get(u.id, 0),
-                "banned": u.is_banned
+                "banned": u.is_banned,
+                "phone_number": sessions.get(u.id),
+                "expires_at": active_tariffs.get(u.id).isoformat() if u.id in active_tariffs else None
             }
         return users_dict
 

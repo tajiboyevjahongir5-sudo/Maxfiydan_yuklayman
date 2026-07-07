@@ -9,9 +9,10 @@
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         :root{
-            --bg:#0b1120;--sidebar:#111827;--card:rgba(17,24,39,.8);
-            --border:rgba(255,255,255,.07);--primary:#3b82f6;--danger:#ef4444;
-            --success:#22c55e;--warn:#f59e0b;--text:#f1f5f9;--muted:#64748b;
+            --bg:#070911;--sidebar:#0a0d16;--card:rgba(14,19,32,.9);
+            --border:rgba(0,240,255,.15);--primary:#00f0ff;--primary-glow:0 0 15px rgba(0,240,255,0.4);
+            --danger:#ff003c;--danger-glow:0 0 15px rgba(255,0,60,0.4);
+            --success:#22c55e;--warn:#f59e0b;--text:#e2e8f0;--muted:#64748b;
         }
         body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;overflow-x:hidden}
 
@@ -48,11 +49,12 @@
         h3{font-size:1rem;font-weight:600;margin-bottom:1rem}
         
         /* ── Cards ── */
-        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:1.5rem}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:1.5rem;box-shadow:inset 0 0 20px rgba(0,240,255,0.02)}
         .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
-        .stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem}
-        .stat .val{font-size:2rem;font-weight:700;margin-top:.5rem;line-height:1.2;min-height:2.5rem}
-        .stat .lbl{font-size:.8rem;color:var(--muted);font-weight:500}
+        .stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;position:relative;overflow:hidden;box-shadow:inset 0 0 10px rgba(0,240,255,0.05)}
+        .stat .val{font-size:2rem;font-weight:700;margin-top:.5rem;line-height:1.2;min-height:2.5rem;background:linear-gradient(90deg, #fff, var(--primary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:var(--primary-glow)}
+        .stat .lbl{font-size:.8rem;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:1px;}
+        .stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:40%;background:linear-gradient(to top, rgba(0,240,255,0.1), transparent);pointer-events:none;}
         
         /* ── Tables ── */
         .tbl-wrap{overflow-x:auto}
@@ -70,11 +72,11 @@
         textarea{resize:vertical;min-height:80px}
         
         /* ── Buttons ── */
-        .btn{padding:.55rem 1.2rem;border:none;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .15s}
-        .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{opacity:.88}
-        .btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{opacity:.88}
+        .btn{padding:.55rem 1.2rem;border:none;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:0.5px;}
+        .btn-primary{background:transparent;border:1px solid var(--primary);color:var(--primary);box-shadow:var(--primary-glow)}.btn-primary:hover{background:var(--primary);color:#000;box-shadow:0 0 25px var(--primary)}
+        .btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger);box-shadow:var(--danger-glow)}.btn-danger:hover{background:var(--danger);color:#fff;box-shadow:0 0 25px var(--danger)}
         .btn-sm{padding:.35rem .8rem;font-size:.8rem}
-        .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{background:rgba(255,255,255,.06)}
+        .btn-outline{background:transparent;border:1px solid var(--muted);color:var(--text)}.btn-outline:hover{background:rgba(255,255,255,.06);border-color:var(--text)}
         
         /* ── Badge ── */
         .badge{display:inline-block;padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600}
@@ -188,25 +190,28 @@
 
     <!-- DASHBOARD -->
     <div id="s-dashboard" class="section active">
-        <h2>Dashboard</h2>
+        <h2 style="color:var(--primary);text-shadow:var(--primary-glow)">Dashboard</h2>
         <div class="stats">
             <div class="stat"><div class="lbl">Jami So'rovlar</div><div class="val" id="st-total">—</div></div>
-            <div class="stat"><div class="lbl">Muvaffaqiyatli</div><div class="val" id="st-ok" style="color:var(--success)">—</div></div>
-            <div class="stat"><div class="lbl">Xatolar</div><div class="val" id="st-err" style="color:var(--danger)">—</div></div>
-            <div class="stat"><div class="lbl">Faol Foydalanuvchilar</div><div class="val" id="st-active">—</div></div>
+            <div class="stat"><div class="lbl" style="color:var(--success)">Muvaffaqiyatli</div><div class="val" id="st-ok" style="background:linear-gradient(90deg, #fff, var(--success));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 10px rgba(34,197,94,0.4)">—</div></div>
+            <div class="stat"><div class="lbl" style="color:var(--danger)">Xatolar</div><div class="val" id="st-err" style="background:linear-gradient(90deg, #fff, var(--danger));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:var(--danger-glow)">—</div></div>
+            <div class="stat"><div class="lbl">Faol Foydalanuvchilar</div><div class="val" id="st-active" style="background:linear-gradient(90deg, #fff, #d100d1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 10px rgba(209,0,209,0.5)">—</div></div>
         </div>
     </div>
 
     <!-- USERS -->
     <div id="s-users" class="section">
-        <h2>Foydalanuvchilar</h2>
-        <div class="card">
-            <div class="tbl-wrap">
-                <table>
-                    <thead><tr><th>ID</th><th>Ism</th><th>Username</th><th>So'rovlar</th><th>Holat</th><th>Amal</th></tr></thead>
-                    <tbody id="users-body"><tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Yuklanmoqda...</td></tr></tbody>
-                </table>
-            </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+            <h2 style="margin:0;color:var(--primary);text-shadow:var(--primary-glow)">Foydalanuvchilar</h2>
+            <div style="color:var(--primary); font-weight:600;" id="users-count">0 ta</div>
+        </div>
+        
+        <div style="margin-bottom:1.5rem;">
+            <input type="text" id="users-search" placeholder="Ism, ID yoki username bo'yicha izlash..." style="padding:0.8rem 1.2rem; font-size:0.95rem; background:var(--card); border-radius:12px; border:1px solid var(--border);" oninput="filterUsers()">
+        </div>
+
+        <div id="users-body" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1.5rem;">
+            <div style="text-align:center;padding:2rem;color:var(--muted);grid-column:1/-1">Yuklanmoqda...</div>
         </div>
     </div>
 
@@ -272,10 +277,14 @@
 
     <!-- BROADCAST -->
     <div id="s-broadcast" class="section">
-        <h2>Ommaviy Xabar Yuborish</h2>
+        <h2 style="color:var(--primary);text-shadow:var(--primary-glow)">Ommaviy Xabar Yuborish</h2>
         <div class="card" style="max-width:600px">
             <h3>Barcha foydalanuvchilarga xabar</h3>
             <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">HTML formatida yozing: &lt;b&gt;, &lt;i&gt;, &lt;a href=''&gt; va boshqalar.</p>
+            <div style="margin-bottom:1rem">
+                <label>Rasm yuklash (Ixtiyoriy)</label>
+                <input type="file" id="bc-image" accept="image/*" style="padding: 0.4rem; background:var(--bg)">
+            </div>
             <div style="margin-bottom:1rem">
                 <label>Xabar matni</label>
                 <textarea id="bc-text" rows="5" placeholder="Assalomu alaykum! 🎉&#10;Yangi xususiyat qo'shildi..."></textarea>
@@ -523,28 +532,78 @@ async function loadDashboard() {
 }
 
 // ── Users ──────────────────────────────────────────────────────────────────
+let allUsersData = [];
+
 async function loadUsers() {
     const data = await api('/api/users');
-    const tbody = document.getElementById('users-body');
+    const container = document.getElementById('users-body');
     if (!data) return;
-    // API dict qaytaradi: { user_id: {...} } — arrayga o'tkazamiz
-    const users = Object.entries(data).map(([id, u]) => ({ id, ...u }));
-    tbody.innerHTML = users.length ? users.map(u => `
-        <tr>
-            <td data-label="ID"><code style="font-size:.8rem;color:#94a3b8">${u.id}</code></td>
-            <td data-label="Ism">${u.name || '—'}</td>
-            <td data-label="Username">—</td>
-            <td data-label="So'rovlar">${u.requests ?? 0}</td>
-            <td data-label="Holat">${u.banned
-                ? '<span class="badge badge-red">Bloklangan</span>'
-                : '<span class="badge badge-green">Faol</span>'}</td>
-            <td data-label="Amal">
-                <button class="btn btn-sm ${u.banned ? 'btn-primary' : 'btn-danger'}"
-                    onclick="toggleBan('${u.id}', this)">
-                    ${u.banned ? 'Qulfdan chiq.' : 'Bloklash'}
+    allUsersData = Object.entries(data).map(([id, u]) => ({ id, ...u }));
+    document.getElementById('users-count').textContent = `${allUsersData.length} ta`;
+    renderUsers(allUsersData);
+}
+
+function filterUsers() {
+    const q = document.getElementById('users-search').value.toLowerCase();
+    const filtered = allUsersData.filter(u => 
+        (u.name && u.name.toLowerCase().includes(q)) || 
+        (u.username && u.username.toLowerCase().includes(q)) || 
+        u.id.includes(q)
+    );
+    renderUsers(filtered);
+}
+
+function renderUsers(users) {
+    const container = document.getElementById('users-body');
+    container.innerHTML = users.length ? users.map(u => {
+        const name = u.name || '—';
+        const initial = name !== '—' ? name.charAt(0).toUpperCase() : '?';
+        const username = u.username ? `@${u.username}` : '';
+        const phone = u.phone_number ? `📞 ${u.phone_number}` : '<span style="color:var(--danger)">📞 Raqam kiritilmagan</span>';
+        
+        let subStatus = '<span style="color:var(--muted)">Aktiv obuna yo\'q</span>';
+        if (u.expires_at) {
+            const exp = new Date(u.expires_at);
+            if (exp > new Date()) {
+                subStatus = `<span style="color:var(--success)">Aktiv obuna (gacha: ${exp.toLocaleDateString()})</span>`;
+            }
+        }
+
+        return `
+        <div class="user-card card" style="display:flex; flex-direction:column; gap:1rem; position:relative; margin-bottom:0; box-shadow:none;">
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <div style="width:50px; height:50px; border-radius:12px; background:linear-gradient(135deg, var(--primary), #8b5cf6); display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:bold; color:#000;">
+                    ${initial}
+                </div>
+                <div style="flex:1; overflow:hidden;">
+                    <h3 style="margin-bottom:0.25rem; font-size:1.1rem; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${name}</h3>
+                    <p style="color:var(--primary); font-size:0.85rem; margin-bottom:0.2rem;">${username}</p>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                    <button class="btn btn-sm btn-outline" style="padding:0.4rem; font-size:1rem;" onclick="navigator.clipboard.writeText('${u.id}'); toast('ID nusxalandi!')" title="ID dan nusxa olish">📋</button>
+                    ${u.username ? `<a class="btn btn-sm btn-outline" href="https://t.me/${u.username}" target="_blank" style="padding:0.4rem; font-size:1rem; text-decoration:none; text-align:center;" title="Profilga o'tish">✈️</a>` : ''}
+                </div>
+            </div>
+            
+            <div style="background:rgba(255,255,255,0.03); padding:1rem; border-radius:8px; display:flex; flex-direction:column; gap:0.5rem; font-size:0.85rem; border:1px solid rgba(255,255,255,0.05);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>${phone}</div>
+                    <div style="font-weight:600;">${subStatus}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="color:var(--muted)">ID: <code style="color:var(--text)">${u.id}</code></div>
+                    <div style="color:var(--muted)">So'rovlar: <span style="color:var(--text); font-weight:bold;">${u.requests ?? 0}</span></div>
+                </div>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; margin-top:auto; padding-top:0.5rem;">
+                <button class="btn btn-sm ${u.banned ? 'btn-primary' : 'btn-danger'}" onclick="toggleBan('${u.id}', this)" style="width:100%">
+                    ${u.banned ? '🔓 Qulfdan chiqarish' : '🔒 Bloklash'}
                 </button>
-            </td>
-        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Foydalanuvchilar yo'q</td></tr>`;
+            </div>
+        </div>
+        `;
+    }).join('') : `<div style="text-align:center;padding:2rem;color:var(--muted);grid-column:1/-1">Foydalanuvchilar yo'q</div>`;
 }
 
 async function toggleBan(uid, btn) {
@@ -712,18 +771,32 @@ async function deleteTariff(id) {
 // ── Broadcast ──────────────────────────────────────────────────────────────
 async function sendBroadcast() {
     const text = document.getElementById('bc-text').value.trim();
-    if (!text) { toast('Xabar matnini kiriting!', '#ef4444'); return; }
+    const fileInput = document.getElementById('bc-image');
+    
+    if (!text && (!fileInput.files || fileInput.files.length === 0)) { 
+        toast('Xabar matni yoki rasm kiriting!', '#ef4444'); 
+        return; 
+    }
+    
     if (!confirm(`Barcha foydalanuvchilarga xabar yuboriladimi?`)) return;
+
+    const formData = new FormData();
+    formData.append('text', text || '');
+    if (fileInput.files && fileInput.files.length > 0) {
+        formData.append('image', fileInput.files[0]);
+    }
 
     const res = await fetch('/api/admin/broadcast', {
         method:'POST',
-        headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${TOKEN}` },
-        body: JSON.stringify({ text })
+        headers: { Authorization:`Bearer ${TOKEN}` }, 
+        body: formData
     });
+    
     if (res.ok) {
         const d = await res.json();
         toast(`✅ ${d.users_count} ta foydalanuvchiga yuborildi`);
         document.getElementById('bc-text').value = '';
+        fileInput.value = '';
     } else { toast('Xato!', '#ef4444'); }
 }
 

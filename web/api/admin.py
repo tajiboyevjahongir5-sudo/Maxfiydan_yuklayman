@@ -143,28 +143,52 @@ async def delete_tariff(tariff_id: int):
 class BroadcastMessage(BaseModel):
     text: str
 
+from fastapi import Form, UploadFile, File
+
 @router.post("/broadcast")
-async def send_broadcast(msg: BroadcastMessage = Body(...)):
+async def send_broadcast(
+    text: str = Form(...),
+    image: Optional[UploadFile] = File(None)
+):
     # This requires importing the bot instance.
-    # We will do this carefully to avoid circular imports.
-    from bot_instance import bot # We assume we export the bot in main or bot_instance
+    from bot_instance import bot
     import asyncio
     
-    async def _send_task(users, text):
+    # Save image temporarily if exists
+    photo_path = None
+    if image and image.filename:
+        import os
+        from uuid import uuid4
+        photo_path = f"/tmp/{uuid4()}_{image.filename}"
+        with open(photo_path, "wb") as f:
+            f.write(await image.read())
+
+    async def _send_task(users, text, photo):
+        from aiogram.types import FSInputFile
         for user in users:
             try:
-                await bot.send_message(chat_id=user.id, text=text)
+                if photo:
+                    await bot.send_photo(chat_id=user.id, photo=FSInputFile(photo), caption=text)
+                else:
+                    await bot.send_message(chat_id=user.id, text=text)
                 await asyncio.sleep(0.1) # Flood wait avoid
             except Exception:
                 pass
-                
+        
+        # Cleanup
+        if photo and os.path.exists(photo):
+            try:
+                os.remove(photo)
+            except:
+                pass
+
     async with async_session() as db:
         result = await db.execute(select(User))
         users = result.scalars().all()
         
     # Run in background to avoid blocking API
     import asyncio
-    asyncio.create_task(_send_task(users, msg.text))
+    asyncio.create_task(_send_task(users, text, photo_path))
     
     return {"status": "success", "users_count": len(users)}
 
