@@ -278,9 +278,15 @@
         <div class="card" style="max-width:600px">
             <h3>Barcha foydalanuvchilarga xabar</h3>
             <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">HTML formatida yozing: &lt;b&gt;, &lt;i&gt;, &lt;a href=''&gt; va boshqalar.</p>
-            <div style="margin-bottom:1rem">
-                <label>Rasm yuklash (Ixtiyoriy)</label>
-                <input type="file" id="bc-image" accept="image/*" style="padding: 0.4rem; background:var(--bg)">
+            <div style="margin-bottom:1.5rem">
+                <label style="margin-bottom: 0.5rem; display: block;">Rasm yuklash (Ixtiyoriy)</label>
+                <div class="file-upload-wrapper" style="position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 2px dashed rgba(0, 240, 255, 0.3); border-radius: 12px; background: rgba(0, 240, 255, 0.02); cursor: pointer; padding: 1.5rem; text-align: center; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--primary)'; this.style.background='rgba(0, 240, 255, 0.05)'" onmouseout="this.style.borderColor='rgba(0, 240, 255, 0.3)'; this.style.background='rgba(0, 240, 255, 0.02)'" onclick="document.getElementById('bc-image').click()">
+                    <input type="file" id="bc-image" accept="image/*" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2;" onchange="document.getElementById('file-name-display').textContent = this.files[0] ? this.files[0].name : 'Rasm tanlash uchun bosing'; this.parentElement.style.borderColor = this.files[0] ? 'var(--success)' : 'var(--primary)'">
+                    <div style="pointer-events: none; z-index: 1;">
+                        <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">📸</span>
+                        <span id="file-name-display" style="color: var(--primary); font-weight: 500; font-size: 0.9rem;">Rasm tanlash uchun bosing yoxud tortib keling</span>
+                    </div>
+                </div>
             </div>
             <div style="margin-bottom:1rem">
                 <label>Xabar matni</label>
