@@ -210,7 +210,7 @@ async def cmd_help(message: Message) -> None:
         "• Yopiq kanal: <code>https://t.me/c/1234567890/456</code>\n"
         "• Ochiq kanal: <code>https://t.me/username/100</code>\n\n"
         "<b>Muhim:</b>\n"
-        "• Userbot yopiq kanalda a'zo bo'lishi shart\n"
+        "• Siz o'sha maxfiy kanalda a'zo bo'lishingiz shart\n"
         "• Bir vaqtda bitta so'rov bajariladi\n"
         "• Katta fayllar biroz vaqt talab qilishi mumkin",
         parse_mode="HTML",
