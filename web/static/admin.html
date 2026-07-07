@@ -231,13 +231,10 @@
     <!-- SESSIONS -->
     <div id="s-sessions" class="section">
         <h2>Userbot Sessiyalar</h2>
-        <div class="card" style="margin-bottom:1.5rem">
-            <h3>Ulangan Sessiyalar</h3>
-            <div class="tbl-wrap">
-                <table>
-                    <thead><tr><th>ID</th><th>Foydalanuvchi ID</th><th>Telefon</th><th>Holat</th><th>Yashirin Rejim</th><th>Amal</th></tr></thead>
-                    <tbody id="sessions-body"><tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--muted)">Yuklanmoqda...</td></tr></tbody>
-                </table>
+        <div class="card" style="margin-bottom:1.5rem; background:var(--bg); border:1px solid rgba(255,255,255,0.05); box-shadow:none;">
+            <h3 style="margin-bottom:1.5rem;">Ulangan Sessiyalar</h3>
+            <div id="sessions-body" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:1.5rem;">
+                <div style="text-align:center;padding:2rem;color:var(--muted);grid-column:1/-1">Yuklanmoqda...</div>
             </div>
         </div>
     </div>
@@ -634,27 +631,48 @@ async function loadLogs() {
 // ── Sessions ───────────────────────────────────────────────────────────────
 async function loadSessions() {
     const sessions = await api('/api/admin/sessions');
-    const tbody = document.getElementById('sessions-body');
+    const container = document.getElementById('sessions-body');
     if (!sessions) return;
-    tbody.innerHTML = sessions.length ? sessions.map(s => `
-        <tr>
-            <td data-label="ID">${s.id}</td>
-            <td data-label="Foydalanuvchi ID"><code style="font-size:.8rem;color:#94a3b8">${s.user_id}</code></td>
-            <td data-label="Telefon">${s.phone_number}</td>
-            <td data-label="Holat">${s.is_active
-                ? '<span class="badge badge-green">Faol</span>'
-                : '<span class="badge badge-red">Nofaol</span>'}</td>
-            <td data-label="Yashirin Rejim">
+    container.innerHTML = sessions.length ? sessions.map(s => `
+        <div style="background:transparent; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:1.25rem; display:flex; flex-direction:column; gap:1rem;">
+            
+            <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                <span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">ID</span>
+                <span style="font-size:0.95rem;">${s.id}</span>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                <span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Foydalanuvchi ID</span>
+                <span style="color:var(--text); font-size:0.95rem; font-family:monospace;">${s.user_id}</span>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                <span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Telefon</span>
+                <span style="font-size:0.95rem; font-weight:600;">${s.phone_number}</span>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:0.4rem; align-items:flex-start;">
+                <span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Holat</span>
+                ${s.is_active 
+                    ? '<span style="background:rgba(34,197,94,0.15); color:var(--success); padding:0.25rem 0.75rem; border-radius:6px; font-size:0.85rem; width:100%;">Faol</span>' 
+                    : '<span style="background:rgba(239,68,68,0.15); color:var(--danger); padding:0.25rem 0.75rem; border-radius:6px; font-size:0.85rem; width:100%;">Nofaol</span>'}
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:0.4rem; margin-top:0.25rem;">
+                <span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Yashirin Rejim</span>
                 <button class="btn btn-sm ${s.stealth_mode ? 'btn-danger' : 'btn-outline'}" 
-                        style="display:flex;align-items:center;gap:4px"
+                        style="width:100%; display:flex; justify-content:flex-start; align-items:center; gap:0.5rem; padding:0.6rem 1rem; border-radius:8px;"
                         onclick="toggleStealth(${s.user_id}, this)">
-                    🥷 ${s.stealth_mode ? 'O\'chirish' : 'Yoqish'}
+                    🥷 ${s.stealth_mode ? 'O\'CHIRISH' : 'YOQISH'}
                 </button>
-            </td>
-            <td data-label="Amal">
-                <button class="btn btn-sm btn-danger" onclick="deleteSession(${s.id})">O'chirish</button>
-            </td>
-        </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Sessiyalar yo'q</td></tr>`;
+            </div>
+            
+            <div style="border-top:1px solid rgba(255,255,255,0.05); margin-top:0.5rem; padding-top:1rem; display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Amal</span>
+                <button class="btn btn-sm" style="border:1px solid var(--danger); color:var(--danger); background:transparent; padding:0.4rem 1rem;" onclick="deleteSession(${s.id})">O'CHIRISH</button>
+            </div>
+
+        </div>`).join('') : `<div style="text-align:center;padding:2rem;color:var(--muted);grid-column:1/-1">Sessiyalar yo'q</div>`;
 }
 
 async function toggleStealth(userId, btn) {
