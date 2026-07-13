@@ -227,12 +227,13 @@
                     </div>
 
                     <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-4 text-xs text-slate-300 leading-relaxed">
-                        ⚠️ <b>Muhim:</b> Aynan <b>{{ payData.unique_amount?.toLocaleString() }} so'm</b> o'tkazing. Boshqa summa o'tkazilsa tizim aniqlay olmaydi. To'lovni amalga oshirgandan so'ng chek skrinshotini to'lov kanaliga yuboring.
+                        ⚠️ <b>Muhim:</b> Aynan <b>{{ payData.unique_amount?.toLocaleString() }} so'm</b> o'tkazing. Boshqa summa o'tkazilsa tizim aniqlay olmaydi. To'lovdan so'ng <b>1-2 daqiqa</b> ichida tarif avtomatik faollashadi.
                     </div>
 
-                    <button v-if="countdownSec > 0" @click="startPayStatusPoll" :disabled="polling" class="btn-primary w-full py-3 rounded-xl font-semibold mb-2">
-                        {{ polling ? '⏳ Tasdiq kutilmoqda...' : "To'lovni amalga oshirdim" }}
-                    </button>
+                    <div v-if="countdownSec > 0" class="flex items-center justify-center gap-2 py-3 text-sm text-slate-400">
+                        <span class="inline-block w-3 h-3 rounded-full bg-blue-400 animate-pulse"></span>
+                        {{ polling ? '⏳ To\'lov tekshirilmoqda...' : 'Tayyor bo\'lgach kutilmoqda...' }}
+                    </div>
                     <button @click="cancelPay" class="w-full py-2 text-sm text-slate-400">Bekor qilish</button>
 
                     <!-- Expired -->
@@ -550,9 +551,10 @@ createApp({
                 }
                 this.payData = await res.json();
                 this.paymentId = this.payData.payment_id;
-                this.countdownSec = 120;
+                this.countdownSec = 600;
                 this.payStep = 'info';
                 this.startCountdown();
+                this.startPayStatusPoll();  // Darhol avtomatik tekshiruv boshlash
             } catch { this.tg?.showAlert("Server bilan bog'lanishda xato."); }
         },
         startCountdown() {
@@ -568,6 +570,7 @@ createApp({
             }, 1000);
         },
         startPayStatusPoll() {
+            if (this.polling) return;
             this.polling = true;
             this.pollTimer = setInterval(async () => {
                 try {

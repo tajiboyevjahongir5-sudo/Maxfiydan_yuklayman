@@ -8,7 +8,7 @@ from web.auth import get_current_user_id
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
-PAYMENT_TIMEOUT_SECONDS = 120  # 2 daqiqa
+PAYMENT_TIMEOUT_SECONDS = 600  # 10 daqiqa
 
 
 # ─── Tariff ro'yxati ────────────────────────────────────────────────────────
