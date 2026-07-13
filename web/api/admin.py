@@ -139,7 +139,70 @@ async def delete_tariff(tariff_id: int):
         await db.commit()
         return {"status": "success"}
 
-# --- BROADCAST ---
+# --- ADMIN: Foydalanuvchiga tarif ulash ---
+class AssignTariffIn(BaseModel):
+    tariff_id: int
+    duration: str  # "1m", "3m", "6m", "1y", "unlimited"
+
+@router.post("/users/{user_id}/assign-tariff")
+async def assign_tariff_to_user(user_id: int, data: AssignTariffIn):
+    from database import UserTariff
+    from datetime import datetime, timedelta
+
+    duration_map = {
+        "1m":  timedelta(days=30),
+        "3m":  timedelta(days=90),
+        "6m":  timedelta(days=180),
+        "1y":  timedelta(days=365),
+        "unlimited": timedelta(days=365 * 100),  # 100 yil = cheksiz
+    }
+
+    if data.duration not in duration_map:
+        raise HTTPException(status_code=400, detail="Noto'g'ri muddat")
+
+    async with async_session() as db:
+        # Tarif mavjudligini tekshirish
+        tariff = await db.get(Tariff, data.tariff_id)
+        if not tariff:
+            raise HTTPException(status_code=404, detail="Tarif topilmadi")
+
+        expires_at = datetime.utcnow() + duration_map[data.duration]
+
+        # Mavjud tarifni yangilash yoki yangi qo'shish
+        result = await db.execute(select(UserTariff).where(UserTariff.user_id == user_id))
+        existing = result.scalar_one_or_none()
+
+        if existing:
+            existing.tariff_id = data.tariff_id
+            existing.expires_at = expires_at
+        else:
+            db.add(UserTariff(user_id=user_id, tariff_id=data.tariff_id, expires_at=expires_at))
+
+        await db.commit()
+
+        # Foydalanuvchiga bot xabari yuborish
+        try:
+            from bot_instance import bot
+            duration_labels = {
+                "1m": "1 oy", "3m": "3 oy", "6m": "6 oy",
+                "1y": "1 yil", "unlimited": "Cheksiz"
+            }
+            await bot.send_message(
+                chat_id=user_id,
+                text=(
+                    f"🎁 <b>Tabriklaymiz!</b>\n\n"
+                    f"Admin tomonidan sizga <b>{tariff.name}</b> tarifi ulandi!\n"
+                    f"⏳ Muddat: <b>{duration_labels[data.duration]}</b>\n\n"
+                    f"Botdan to'liq foydalanishingiz mumkin. ✅"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+        return {"status": "success", "expires_at": expires_at.isoformat()}
+
+
 class BroadcastMessage(BaseModel):
     text: str
 

@@ -396,6 +396,36 @@
         </div>
     </div>
 
+    <!-- ══ ASSIGN TARIFF MODAL ══ -->
+    <div id="assign-tariff-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:200; align-items:center; justify-content:center; padding:1rem;">
+        <div class="card" style="width:100%; max-width:420px; position:relative; border:1px solid var(--primary); box-shadow:var(--primary-glow);">
+            <button onclick="document.getElementById('assign-tariff-modal').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--muted);font-size:1.25rem;cursor:pointer;">✕</button>
+            <h3 style="margin-bottom:0.25rem; color:var(--primary);">🎁 Tarif Ulash</h3>
+            <p id="assign-user-label" style="color:var(--muted); font-size:0.85rem; margin-bottom:1.5rem;"></p>
+            <input type="hidden" id="assign-user-id">
+
+            <div style="margin-bottom:1rem;">
+                <label>Tarif tanlang</label>
+                <select id="assign-tariff-id" style="background:#1e293b; border:1px solid var(--border); border-radius:10px; padding:.6rem .9rem; color:var(--text); width:100%; font-size:.875rem;">
+                </select>
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <label>Muddat</label>
+                <select id="assign-duration" style="background:#1e293b; border:1px solid var(--border); border-radius:10px; padding:.6rem .9rem; color:var(--text); width:100%; font-size:.875rem;">
+                    <option value="1m">1 Oy</option>
+                    <option value="3m">3 Oy</option>
+                    <option value="6m">6 Oy</option>
+                    <option value="1y">1 Yil</option>
+                    <option value="unlimited">♾️ Cheksiz</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:0.75rem;">
+                <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('assign-tariff-modal').style.display='none'">Bekor qilish</button>
+                <button class="btn btn-primary" style="flex:1" onclick="assignTariff()">✅ Ulash</button>
+            </div>
+        </div>
+    </div>
+
     <footer>@maxfiydan_yuklayman_bot</footer>
 
 </main>
@@ -599,9 +629,10 @@ function renderUsers(users) {
                 </div>
             </div>
             
-            <div style="display:flex; justify-content:flex-end; margin-top:auto; padding-top:0.5rem;">
-                <button class="btn btn-sm ${u.banned ? 'btn-primary' : 'btn-danger'}" onclick="toggleBan('${u.id}', this)" style="width:100%">
-                    ${u.banned ? '🔓 Qulfdan chiqarish' : '🔒 Bloklash'}
+            <div style="display:flex; justify-content:flex-end; margin-top:auto; padding-top:0.5rem; gap:0.5rem;">
+                <button class="btn btn-sm btn-outline" style="flex:1" onclick="openAssignModal('${u.id}', '${(u.name||'Foydalanuvchi').replace(/'/g, "'")}')">🎁 Tarif</button>
+                <button class="btn btn-sm ${u.banned ? 'btn-primary' : 'btn-danger'}" onclick="toggleBan('${u.id}', this)" style="flex:1">
+                    ${u.banned ? '🔓 Qulfdan' : '🔒 Bloklash'}
                 </button>
             </div>
         </div>
@@ -614,6 +645,52 @@ async function toggleBan(uid, btn) {
     toast('Holat o\'zgartirildi');
     loadUsers();
 }
+
+async function openAssignModal(uid, name) {
+    document.getElementById('assign-user-id').value = uid;
+    document.getElementById('assign-user-label').innerHTML = `Foydalanuvchi: <b style="color:var(--text)">${name}</b> (ID: <code>${uid}</code>)`;
+    
+    // Tariflarni yuklash
+    const tariffs = await api('/api/admin/tariffs');
+    const select = document.getElementById('assign-tariff-id');
+    select.innerHTML = '';
+    if (tariffs && tariffs.length > 0) {
+        tariffs.forEach(t => {
+            select.innerHTML += `<option value="${t.id}">${t.name} (${t.price > 0 ? t.price + ' so\'m' : 'Bepul'})</option>`;
+        });
+    } else {
+        select.innerHTML = '<option value="">Tariflar yo\'q</option>';
+    }
+    
+    document.getElementById('assign-tariff-modal').style.display = 'flex';
+}
+
+async function assignTariff() {
+    const uid = document.getElementById('assign-user-id').value;
+    const tariffId = document.getElementById('assign-tariff-id').value;
+    const duration = document.getElementById('assign-duration').value;
+    
+    if (!tariffId) {
+        toast('Tarifni tanlang!', '#ef4444');
+        return;
+    }
+    
+    const res = await fetch(`/api/admin/users/${uid}/assign-tariff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
+        body: JSON.stringify({ tariff_id: parseInt(tariffId), duration: duration })
+    });
+    
+    if (res.ok) {
+        toast('Tarif foydalanuvchiga muvaffaqiyatli ulandi! 🎁');
+        document.getElementById('assign-tariff-modal').style.display = 'none';
+        loadUsers();
+    } else {
+        const err = await res.json();
+        toast(err.detail || 'Xato yuz berdi!', '#ef4444');
+    }
+}
+
 
 // ── Logs ───────────────────────────────────────────────────────────────────
 async function loadLogs() {
