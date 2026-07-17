@@ -334,7 +334,7 @@ async def handle_link(message: Message) -> None:
             from utils import human_readable_size
             last_edit_time = 0
 
-            async def on_download_progress(current: int, total: int, *args, **kwargs):
+            async def on_download_progress(current: int, total: int, current_file: int = 1, total_files: int = 1, *args, **kwargs):
                 nonlocal last_edit_time
                 now = time.time()
                 # 2 soniyada bir marta yangilash (FloodWait oldini olish uchun)
@@ -343,34 +343,45 @@ async def handle_link(message: Message) -> None:
                     pct = (current / total * 100) if total else 0
                     c_str = human_readable_size(current)
                     t_str = human_readable_size(total) if total else "?"
+                    
+                    file_info = f" ({current_file}/{total_files})" if total_files > 1 else ""
+                    
                     import asyncio
                     asyncio.create_task(_edit_progress(progress_msg, 
-                        f"📥 <b>Media serverga yuklanmoqda...</b>\n\n"
+                        f"📥 <b>Media serverga yuklanmoqda...</b>{file_info}\n\n"
                         f"📊 {pct:.1f}%\n"
                         f"💾 {c_str} / {t_str}"
                     ))
 
             # ── 5. Userbot orqali media yuklab olish ──────────────────────
             await _edit_progress(progress_msg, "📥 Media serverga yuklanmoqda...")
-            downloaded_path, media_type = await userbot.fetch_and_download(user_id, parsed, progress_callback=on_download_progress)
+            downloaded_files = await userbot.fetch_and_download(user_id, parsed, progress_callback=on_download_progress)
+
+            if not downloaded_files:
+                raise Exception("Fayllarni yuklab olish imkoni bo'lmadi.")
 
             # DB ga tarix yozish
             async with async_session() as db:
-                history = DownloadHistory(
-                    user_id=user_id,
-                    file_name=downloaded_path.name,
-                    file_size_bytes=downloaded_path.stat().st_size
-                )
-                db.add(history)
+                for f_path, _ in downloaded_files:
+                    history = DownloadHistory(
+                        user_id=user_id,
+                        file_name=f_path.name,
+                        file_size_bytes=f_path.stat().st_size
+                    )
+                    db.add(history)
                 await db.commit()
 
             # ── 6. Aiogram orqali foydalanuvchiga yuborish ─────────────────
             await _edit_progress(progress_msg, "📤 Sizga yuborilmoqda...")
-            await _send_file_to_user(message, downloaded_path, media_type)
+            
+            if len(downloaded_files) == 1:
+                await _send_file_to_user(message, downloaded_files[0][0], downloaded_files[0][1])
+            else:
+                await _send_media_group_to_user(message, downloaded_files)
 
             logger.info(
                 f"✅ Muvaffaqiyatli yuborildi: user={user_id}, "
-                f"fayl={downloaded_path.name}"
+                f"fayllar_soni={len(downloaded_files)}"
             )
             add_log(user_id, user_name, text, "success")
 
@@ -429,15 +440,20 @@ async def handle_link(message: Message) -> None:
 
         finally:
             # ── 7. Disk tozalash — SHART! ─────────────────────────────────
-            # Xatolik bo'lsa ham, muvaffaqiyatli bo'lsa ham fayl o'chiriladi
-            if downloaded_path and downloaded_path.exists():
+            # Xatolik bo'lsa ham, muvaffaqiyatli bo'lsa ham barcha fayllar o'chiriladi
+            if 'downloaded_files' in locals() and downloaded_files:
+                for f_path, _ in downloaded_files:
+                    if f_path and f_path.exists():
+                        try:
+                            os.remove(f_path)
+                            logger.info(f"🗑️  Vaqtinchalik fayl o'chirildi: {f_path.name}")
+                        except OSError as remove_err:
+                            logger.error(f"Faylni o'chirishda xato: {f_path} — {remove_err}")
+            elif 'downloaded_path' in locals() and downloaded_path and downloaded_path.exists():
                 try:
                     os.remove(downloaded_path)
-                    logger.info(f"🗑️  Vaqtinchalik fayl o'chirildi: {downloaded_path.name}")
-                except OSError as remove_err:
-                    logger.error(
-                        f"Faylni o'chirishda xato: {downloaded_path} — {remove_err}"
-                    )
+                except OSError:
+                    pass
 
 
 # ─── Yordamchi funksiyalar ───────────────────────────────────────────────────
@@ -497,3 +513,37 @@ async def _send_file_to_user(message: Message, file_path: Path, media_type=None)
                 document=input_file,
                 caption="✅ Mana sizning faylingiz!",
             )
+
+async def _send_media_group_to_user(message: Message, files: list[tuple[Path, str]]) -> None:
+    """
+    Bir nechta faylni Media Group (Albom) sifatida yuboradi.
+    """
+    from aiogram.types import InputMediaPhoto, InputMediaVideo, InputMediaDocument
+    from utils import MediaType
+    
+    media_group = []
+    
+    for idx, (file_path, m_type) in enumerate(files):
+        input_file = FSInputFile(path=file_path)
+        caption = "✅ Albom yuklandi!" if idx == 0 else None
+        
+        if m_type == MediaType.PHOTO:
+            media_group.append(InputMediaPhoto(media=input_file, caption=caption))
+        elif m_type == MediaType.VIDEO:
+            media_group.append(InputMediaVideo(media=input_file, caption=caption, supports_streaming=True))
+        else:
+            # Agar hujjat yoki boshqa bo'lsa, media guruhda ba'zida faqat photo/video ruxsat etiladi.
+            # Lekin Document ham albom bo'lishi mumkin. Kengaytmadan tekshiramiz.
+            suffix = file_path.suffix.lower()
+            if suffix in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
+                media_group.append(InputMediaPhoto(media=input_file, caption=caption))
+            elif suffix in {".mp4", ".mov", ".avi", ".mkv", ".webm"}:
+                media_group.append(InputMediaVideo(media=input_file, caption=caption, supports_streaming=True))
+            else:
+                media_group.append(InputMediaDocument(media=input_file, caption=caption))
+                
+    if media_group:
+        # Aiogramda bitta media_group da maksimal 10 ta element bo'lishi mumkin
+        for i in range(0, len(media_group), 10):
+            chunk = media_group[i:i+10]
+            await message.answer_media_group(media=chunk)

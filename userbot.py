@@ -193,15 +193,31 @@ class SessionManager:
     async def fetch_and_download(self, user_id: int, parsed_link: ParsedLink, progress_callback=None):
         """
         Maxsus user_id sessiyasi yordamida medialni yuklab oladi.
-        (path, media_type) tuple qaytaradi.
+        List of (path, media_type) tuples qaytaradi (Albomlar uchun).
         """
         client = self.get_client(user_id)
-        message = await self._get_message(client, parsed_link)
-        media_type = get_media_type(message)
-        file_path = await self._download_media(client, message, progress_callback)
-        return file_path, media_type
+        messages = await self._get_messages(client, parsed_link)
+        
+        results = []
+        total_files = len(messages)
+        
+        for i, message in enumerate(messages):
+            media_type = get_media_type(message)
+            
+            # Progress callback wrapper to include file index if needed
+            async def wrapped_progress(current, total, *args, **kwargs):
+                if progress_callback:
+                    # You can pass overall progress or file-specific progress
+                    # For now, we'll pass standard current/total but we could enhance it
+                    await progress_callback(current, total, current_file=i+1, total_files=total_files)
 
-    async def _get_message(self, client: Client, parsed_link: ParsedLink) -> PyroMessage:
+            file_path = await self._download_media(client, message, wrapped_progress)
+            if file_path:
+                results.append((file_path, media_type))
+                
+        return results
+
+    async def _get_messages(self, client: Client, parsed_link: ParsedLink) -> list[PyroMessage]:
         max_retries = 3
         for attempt in range(1, max_retries + 1):
             try:
@@ -219,11 +235,16 @@ class SessionManager:
                 if not has_media(message):
                     raise NoMediaError("Xabarda yuklanadigan media yo'q.")
 
-                # Stealth: xabarni o'qildi deb belgilamaslik
-                # Pyrogram get_messages() avtomatik o'qimaydi, shuning uchun
-                # read_chat_history() chaqirmaymiz — bu yetarli
+                # Agar media guruhi bo'lsa, barchasini yuklash
+                if message.media_group_id:
+                    media_group = await client.get_media_group(
+                        chat_id=parsed_link.chat_id,
+                        message_id=parsed_link.message_id
+                    )
+                    # Faqat media mavjud xabarlarni filtrlash
+                    return [m for m in media_group if has_media(m)]
 
-                return message
+                return [message]
 
             except FloodWait as e:
                 wait_seconds = e.value
