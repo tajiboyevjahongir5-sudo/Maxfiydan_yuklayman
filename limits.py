@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from sqlalchemy import select, func, and_
+from sqlalchemy.orm import selectinload
 from database import async_session, User, UserTariff, Tariff, DownloadHistory
 
 class LimitExceededError(Exception):
@@ -18,9 +19,10 @@ async def check_download_limits(user_id: int) -> None:
         if not user:
             raise LimitExceededError("Foydalanuvchi topilmadi.")
 
-        # Aktiv tarifini izlash
+        # Aktiv tarifini izlash (tariff munosabatini selectinload bilan yuklaymiz)
         tariff_res = await db.execute(
             select(UserTariff)
+            .options(selectinload(UserTariff.tariff))
             .where(UserTariff.user_id == user_id)
             .where(UserTariff.expires_at > datetime.utcnow())
             .order_by(UserTariff.expires_at.desc())
