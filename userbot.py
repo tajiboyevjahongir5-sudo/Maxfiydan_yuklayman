@@ -237,12 +237,16 @@ class SessionManager:
 
                 # Agar media guruhi bo'lsa, barchasini yuklash
                 if message.media_group_id:
-                    media_group = await client.get_media_group(
-                        chat_id=parsed_link.chat_id,
-                        message_id=parsed_link.message_id
-                    )
-                    # Faqat media mavjud xabarlarni filtrlash
-                    return [m for m in media_group if has_media(m)]
+                    try:
+                        media_group = await client.get_media_group(
+                            chat_id=parsed_link.chat_id,
+                            message_id=parsed_link.message_id
+                        )
+                        filtered_group = [m for m in media_group if has_media(m)]
+                        if filtered_group:
+                            return filtered_group
+                    except Exception as e:
+                        logger.warning(f"get_media_group xatosi (single fallback qo'llaniladi): {e}")
 
                 return [message]
 
