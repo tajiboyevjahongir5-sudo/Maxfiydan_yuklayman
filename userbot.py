@@ -20,6 +20,11 @@ from sqlalchemy import select
 
 from pyrogram import Client, filters
 from pyrogram.errors import (
+    AuthKeyUnregistered,
+    AuthKeyInvalid,
+    AuthKeyDuplicated,
+    SessionRevoked,
+    Unauthorized,
     ChannelInvalid,
     ChannelPrivate,
     FloodWait,
@@ -40,6 +45,11 @@ logger = logging.getLogger(__name__)
 
 class UserbotError(Exception):
     """Userbot operatsiyalari uchun maxsus xato sinfi."""
+    pass
+
+
+class SessionRevokedError(UserbotError):
+    """Sessiya Telegram tomonidan bekor qilinganda yoki eskirganda otiladigan xato."""
     pass
 
 
@@ -136,9 +146,21 @@ class SessionManager:
 
             client.add_handler(MessageHandler(stealth_interceptor))
             
-            await client.start()
-            self.clients[user_id] = client
-            me = await client.get_me()
+            try:
+                await client.start()
+                self.clients[user_id] = client
+                me = await client.get_me()
+            except (AuthKeyUnregistered, AuthKeyInvalid, AuthKeyDuplicated, SessionRevoked, Unauthorized) as e:
+                logger.warning(f"⚠️ User ID {user_id} sessiyasi bekor qilingan (start paytida): {e}")
+                await self.remove_invalid_session(user_id)
+                return
+            except Exception as e:
+                err_msg = str(e).lower()
+                if any(k in err_msg for k in ["key is not registered", "auth_key_unregistered", "session_revoked", "session_expired", "user_deactivated"]):
+                    logger.warning(f"⚠️ User ID {user_id} sessiyasi bekor qilingan (start paytida): {e}")
+                    await self.remove_invalid_session(user_id)
+                    return
+                raise e
 
             # Yangi login bildirishnomalarini avtomatik o'chirish (777000 dan keladi)
             try:
@@ -172,6 +194,29 @@ class SessionManager:
 
             logger.info(f"✅ Userbot (ID: {user_id}) ulandi: @{me.username or me.first_name}")
 
+    async def remove_invalid_session(self, user_id: int) -> None:
+        """Bekor qilingan/yaroqsiz sessiyani to'xtatadi va bazada faolsizlantiradi."""
+        async with self._lock:
+            client = self.clients.pop(user_id, None)
+            if client:
+                try:
+                    if client.is_connected:
+                        await client.stop()
+                except Exception:
+                    pass
+        try:
+            async with async_session() as db:
+                result = await db.execute(
+                    select(UserSession).where(UserSession.user_id == user_id)
+                )
+                sessions = result.scalars().all()
+                for s in sessions:
+                    s.is_active = False
+                await db.commit()
+            logger.warning(f"⚠️ Sessiya bekor qilindi va faolsizlantirildi (User ID: {user_id})")
+        except Exception as e:
+            logger.error(f"Sessiyani faolsizlantirishda DB xatosi: {e}")
+
     async def stop_all(self) -> None:
         """Barcha ochiq sessiyalarni to'xtatadi."""
         async with self._lock:
@@ -195,29 +240,33 @@ class SessionManager:
         Maxsus user_id sessiyasi yordamida medialni yuklab oladi.
         List of (path, media_type) tuples qaytaradi (Albomlar uchun).
         """
-        client = self.get_client(user_id)
-        messages = await self._get_messages(client, parsed_link)
-        
-        results = []
-        total_files = len(messages)
-        
-        for i, message in enumerate(messages):
-            media_type = get_media_type(message)
+        try:
+            client = self.get_client(user_id)
+            messages = await self._get_messages(client, parsed_link, user_id)
             
-            # Progress callback wrapper to include file index if needed
-            async def wrapped_progress(current, total, *args, **kwargs):
-                if progress_callback:
-                    # You can pass overall progress or file-specific progress
-                    # For now, we'll pass standard current/total but we could enhance it
-                    await progress_callback(current, total, current_file=i+1, total_files=total_files)
-
-            file_path = await self._download_media(client, message, wrapped_progress)
-            if file_path:
-                results.append((file_path, media_type))
+            results = []
+            total_files = len(messages)
+            
+            for i, message in enumerate(messages):
+                media_type = get_media_type(message)
                 
-        return results
+                async def wrapped_progress(current, total, *args, **kwargs):
+                    if progress_callback:
+                        await progress_callback(current, total, current_file=i+1, total_files=total_files)
 
-    async def _get_messages(self, client: Client, parsed_link: ParsedLink) -> list[PyroMessage]:
+                file_path = await self._download_media(client, message, user_id, wrapped_progress)
+                if file_path:
+                    results.append((file_path, media_type))
+                    
+            return results
+        except (AuthKeyUnregistered, AuthKeyInvalid, AuthKeyDuplicated, SessionRevoked, Unauthorized) as e:
+            await self.remove_invalid_session(user_id)
+            raise SessionRevokedError(
+                "⚠️ Sizning Telegram sessiyangiz bekor qilingan/uzilgan!\n\n"
+                "Iltimos, Web App -> Ulanish bo'limidan Telegram akkauntingizni qayta ulang."
+            ) from e
+
+    async def _get_messages(self, client: Client, parsed_link: ParsedLink, user_id: int) -> list[PyroMessage]:
         max_retries = 3
         for attempt in range(1, max_retries + 1):
             try:
@@ -250,6 +299,12 @@ class SessionManager:
 
                 return [message]
 
+            except (AuthKeyUnregistered, AuthKeyInvalid, AuthKeyDuplicated, SessionRevoked, Unauthorized) as e:
+                await self.remove_invalid_session(user_id)
+                raise SessionRevokedError(
+                    "⚠️ Sizning Telegram sessiyangiz bekor qilingan/uzilgan!\n\n"
+                    "Iltimos, Web App -> Ulanish bo'limidan Telegram akkauntingizni qayta ulang."
+                ) from e
             except FloodWait as e:
                 wait_seconds = e.value
                 if attempt == max_retries:
@@ -262,15 +317,20 @@ class SessionManager:
             except MsgIdInvalid as e:
                 raise MessageNotFoundError("Xabar ID noto'g'ri!") from e
             except RPCError as e:
+                err_msg = str(e).lower()
+                if any(k in err_msg for k in ["key is not registered", "auth_key_unregistered", "session_revoked", "session_expired", "user_deactivated"]):
+                    await self.remove_invalid_session(user_id)
+                    raise SessionRevokedError(
+                        "⚠️ Sizning Telegram sessiyangiz bekor qilingan/uzilgan!\n\n"
+                        "Iltimos, Web App -> Ulanish bo'limidan Telegram akkauntingizni qayta ulang."
+                    ) from e
                 if attempt == max_retries:
                     raise UserbotError(f"Telegram API xatosi: {e.MESSAGE}") from e
                 await asyncio.sleep(2 ** attempt)
 
-    async def _download_media(self, client: Client, message: PyroMessage, progress_callback=None) -> Path:
+    async def _download_media(self, client: Client, message: PyroMessage, user_id: int, progress_callback=None) -> Path:
         media_type = get_media_type(message)
         file_size = self._get_file_size(message, media_type)
-        
-        # Limit check can be done here or in aiogram handler
         
         unique_prefix = uuid.uuid4().hex[:8]
         dest_path = config.download_dir / f"{unique_prefix}_{message.id}"
@@ -281,9 +341,22 @@ class SessionManager:
                 file_name=str(dest_path),
                 progress=progress_callback
             )
+        except (AuthKeyUnregistered, AuthKeyInvalid, AuthKeyDuplicated, SessionRevoked, Unauthorized) as e:
+            await self.remove_invalid_session(user_id)
+            raise SessionRevokedError(
+                "⚠️ Sizning Telegram sessiyangiz bekor qilingan/uzilgan!\n\n"
+                "Iltimos, Web App -> Ulanish bo'limidan Telegram akkauntingizni qayta ulang."
+            ) from e
         except FloodWait as e:
             raise UserbotError(f"Yuklash cheklandi. {e.value} s kuting.") from e
         except RPCError as e:
+            err_msg = str(e).lower()
+            if any(k in err_msg for k in ["key is not registered", "auth_key_unregistered", "session_revoked", "session_expired", "user_deactivated"]):
+                await self.remove_invalid_session(user_id)
+                raise SessionRevokedError(
+                    "⚠️ Sizning Telegram sessiyangiz bekor qilingan/uzilgan!\n\n"
+                    "Iltimos, Web App -> Ulanish bo'limidan Telegram akkauntingizni qayta ulang."
+                ) from e
             raise UserbotError(f"Media yuklab olinmadi: {e.MESSAGE}") from e
 
         if not downloaded_path:

@@ -38,6 +38,7 @@ from utils import parse_telegram_link, get_media_type, MediaType, logger
 from userbot import (
     userbot,
     UserbotError,
+    SessionRevokedError,
     AccessDeniedError,
     MessageNotFoundError,
     MediaTooLargeError,
@@ -404,6 +405,11 @@ async def handle_link(message: Message) -> None:
             logger.warning(f"MediaTooLargeError: {e}")
             await _edit_progress(progress_msg, str(e))
             add_log(user_id, user_name, text, "error", str(e))
+
+        except SessionRevokedError as e:
+            logger.warning(f"SessionRevokedError: {e}")
+            await _edit_progress(progress_msg, str(e))
+            add_log(user_id, user_name, text, "error", "Sessiya uzilgan")
 
         except UserbotError as e:
             logger.error(f"UserbotError: {e}")
