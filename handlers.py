@@ -139,60 +139,63 @@ async def cb_check_sub(call: CallbackQuery):
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     """Botni ishga tushirganda salomlashish xabarini yuboradi va userni bazaga saqlaydi."""
-    if not await enforce_subscriptions(message):
-        return
+    try:
+        if not await enforce_subscriptions(message):
+            return
 
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    from aiogram.types.web_app_info import WebAppInfo
-    from database import async_session, User
-    from sqlalchemy import select
-    import os
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        from aiogram.types.web_app_info import WebAppInfo
+        from database import async_session, User
+        from sqlalchemy import select
+        import os
 
-    user = message.from_user
-    user_name = user.first_name or "Foydalanuvchi"
+        user = message.from_user
+        user_name = user.first_name or "Foydalanuvchi"
 
-    # ── Foydalanuvchini bazaga saqlash (agar mavjud bo'lmasa) ─────────────
-    async with async_session() as db:
-        result = await db.execute(select(User).where(User.id == user.id))
-        db_user = result.scalar_one_or_none()
+        # ── Foydalanuvchini bazaga saqlash (agar mavjud bo'lmasa) ─────────────
+        async with async_session() as db:
+            result = await db.execute(select(User).where(User.id == user.id))
+            db_user = result.scalar_one_or_none()
 
-        if not db_user:
-            new_user = User(
-                id=user.id,
-                first_name=user.first_name or "",
-                username=user.username,
-            )
-            db.add(new_user)
-            await db.commit()
-            logger.info(f"✅ Yangi foydalanuvchi qo'shildi: {user.id} ({user_name})")
-        else:
-            # Ism va username yangilanishi mumkin
-            if db_user.first_name != (user.first_name or ""):
-                db_user.first_name = user.first_name or ""
-                db_user.username = user.username
+            if not db_user:
+                new_user = User(
+                    id=user.id,
+                    first_name=user.first_name or "",
+                    username=user.username,
+                )
+                db.add(new_user)
                 await db.commit()
+                logger.info(f"✅ Yangi foydalanuvchi qo'shildi: {user.id} ({user_name})")
+            else:
+                # Ism va username yangilanishi mumkin
+                if db_user.first_name != (user.first_name or ""):
+                    db_user.first_name = user.first_name or ""
+                    db_user.username = user.username
+                    await db.commit()
 
-    # Railway bergan domain yoki localhost
-    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
-    if domain:
-        url = f"https://{domain}/user-dashboard"
-    else:
-        url = os.getenv("WEBAPP_URL", "https://maxfiydanyuklayman-production.up.railway.app/user-dashboard")
+        # Railway bergan domain yoki localhost
+        domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+        if domain:
+            url = f"https://{domain}/user-dashboard"
+        else:
+            url = os.getenv("WEBAPP_URL", "https://maxfiydanyuklayman-production.up.railway.app/user-dashboard")
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🌐 Asosiy Sayt (Web App)", web_app=WebAppInfo(url=url))]
-        ]
-    )
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🌐 Asosiy Sayt (Web App)", web_app=WebAppInfo(url=url))]
+            ]
+        )
 
-    await message.answer(
-        f"👋 Salom, <b>{message.from_user.first_name}</b>!\n\n"
-        "🔓 Men yopiq Telegram kanallardan media yuklab beruvchi botman.\n\n"
-        "<b>👇 Pastdagi Web App orqali tizimga kiring va media yuklashni boshlang!</b>\n\n"
-        "🔗 /help — batafsil yordam",
-        reply_markup=keyboard,
-        parse_mode="HTML",
-    )
+        await message.answer(
+            f"👋 Salom, <b>{message.from_user.first_name}</b>!\n\n"
+            "🔓 Men yopiq Telegram kanallardan media yuklab beruvchi botman.\n\n"
+            "<b>👇 Pastdagi Web App orqali tizimga kiring va media yuklashni boshlang!</b>\n\n"
+            "🔗 /help — batafsil yordam",
+            reply_markup=keyboard,
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        logger.error(f"/start komandasida xato: {e}", exc_info=True)
 
 
 @router.message(Command("help"))
