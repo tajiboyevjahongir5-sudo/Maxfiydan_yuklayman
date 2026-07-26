@@ -654,11 +654,18 @@ createApp({
                     body: JSON.stringify({ phone_number: this.phone, password: this.pass2fa })
                 });
                 const d = await res.json();
-                if (d.status === 'success') {
+                if (res.ok && d.status === 'success') {
                     this.sessionActive = true;
                     this.tab = 'home';
                     this.tg?.showAlert("✅ Akkaunt ulandi!");
-                } else { this.tg?.showAlert(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail) || "Xato"); }
+                } else {
+                    let errMsg = "Xato yuz berdi";
+                    if (d.detail) errMsg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
+                    else if (d.message) errMsg = d.message;
+                    this.tg?.showAlert("❌ " + errMsg);
+                }
+            } catch (err) {
+                this.tg?.showAlert("🌐 Ulanishda xatolik: " + err.message);
             } finally { this.loading = false; }
         },
         logout() {
