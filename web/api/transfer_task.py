@@ -1,7 +1,11 @@
 import asyncio
+import inspect
 import logging
+import math
 import os
+import shutil
 import uuid
+import aiofiles
 from pyrogram import Client
 from pyrogram.enums import MessageMediaType, MessagesFilter
 from pyrogram.errors import FloodWait
@@ -35,6 +39,92 @@ def get_media_info(msg):
     if msg.audio:
         return "audio", msg.audio.file_unique_id, msg.audio.file_size or 0, ".mp3", "🎵 Audio"
     return None, None, 0, ".bin", "Fayl"
+
+async def fast_download_media(
+    client: Client,
+    message,
+    dest_file: str,
+    file_size: int,
+    progress_callback = None
+) -> str:
+    """
+    Katta fayllarni Telegram DC serverlaridan 4 ta parallel MTProto oqimida (multi-chunk)
+    juda tez yuklab oladi. 5MB dan kichik fayllar yoki nosozlikda standart yuklab olishga o'tadi.
+    """
+    if file_size <= 5 * 1024 * 1024 or not hasattr(client, "stream_media"):
+        return await client.download_media(message, file_name=dest_file, progress=progress_callback)
+
+    chunk_size = 1024 * 1024  # 1 MiB
+    total_chunks = math.ceil(file_size / chunk_size)
+    num_workers = min(4, total_chunks)
+
+    if num_workers <= 1:
+        return await client.download_media(message, file_name=dest_file, progress=progress_callback)
+
+    chunks_per_worker = math.ceil(total_chunks / num_workers)
+    downloaded_bytes = 0
+    lock = asyncio.Lock()
+
+    async def _worker(w_idx: int, offset: int, limit: int):
+        nonlocal downloaded_bytes
+        part_file = f"{dest_file}.part{w_idx}"
+        async with aiofiles.open(part_file, "wb") as f:
+            async for chunk in client.stream_media(message, limit=limit, offset=offset):
+                await f.write(chunk)
+                async with lock:
+                    downloaded_bytes += len(chunk)
+                    cur_bytes = downloaded_bytes
+                if progress_callback:
+                    try:
+                        res = progress_callback(min(cur_bytes, file_size), file_size)
+                        if inspect.isawaitable(res):
+                            await res
+                    except Exception:
+                        pass
+
+    tasks = []
+    for i in range(num_workers):
+        start_chunk = i * chunks_per_worker
+        end_chunk = min((i + 1) * chunks_per_worker, total_chunks)
+        limit = end_chunk - start_chunk
+        if limit > 0:
+            tasks.append(_worker(i, start_chunk, limit))
+
+    try:
+        await asyncio.gather(*tasks)
+
+        # Barcha qismlarni bitta faylga birlashtirish
+        with open(dest_file, "wb") as out_f:
+            for i in range(num_workers):
+                part_file = f"{dest_file}.part{i}"
+                if os.path.exists(part_file):
+                    with open(part_file, "rb") as in_f:
+                        shutil.copyfileobj(in_f, out_f, length=1024 * 1024)
+                    try:
+                        os.remove(part_file)
+                    except Exception:
+                        pass
+
+        if os.path.exists(dest_file) and os.path.getsize(dest_file) > 0:
+            return dest_file
+        else:
+            raise ValueError("Fayl qismlari birlashtirilmadi yoki bo'sh")
+
+    except Exception as exc:
+        logger.warning(f"Parallel yuklashda ogohlantirish ({exc}), standart yuklab olishga o'tilmoqda...")
+        for i in range(num_workers):
+            part_file = f"{dest_file}.part{i}"
+            if os.path.exists(part_file):
+                try:
+                    os.remove(part_file)
+                except Exception:
+                    pass
+        if os.path.exists(dest_file):
+            try:
+                os.remove(dest_file)
+            except Exception:
+                pass
+        return await client.download_media(message, file_name=dest_file, progress=progress_callback)
 
 async def run_transfer(user_id: int, client: Client, source_chat_id: int, target_chat_id: int, media_type: str):
     logger.info(f"Ko'chirish boshlandi (User {user_id}): {source_chat_id} -> {target_chat_id} ({media_type})")
@@ -228,19 +318,22 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
 
                 unique_name = f"transfer_{user_id}_{uuid.uuid4().hex[:6]}{ext}"
                 dest_file = str(config.download_dir / unique_name)
+                download_timeout = max(120.0, file_size / (300 * 1024)) if file_size else 120.0
+                send_timeout = max(120.0, file_size / (300 * 1024)) if file_size else 120.0
 
-                # 1. Yuklab olish
+                # 1. Tezkor ko'p oqimli (Multi-chunk) yuklab olish
                 file_path = await asyncio.wait_for(
-                    client.download_media(
+                    fast_download_media(
+                        client,
                         message, 
-                        file_name=dest_file,
-                        progress=make_progress("yuklab olinmoqda")
+                        dest_file=dest_file,
+                        file_size=file_size,
+                        progress_callback=make_progress("yuklab olinmoqda")
                     ),
-                    timeout=90.0
+                    timeout=download_timeout
                 )
 
                 if file_path and os.path.exists(file_path):
-                    send_timeout = 90.0
 
                     if m_type == "photo":
                         try:
@@ -337,6 +430,13 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
                         os.remove(file_path)
                     except Exception:
                         pass
+                for i in range(4):
+                    pf = f"{dest_file}.part{i}"
+                    if os.path.exists(pf):
+                        try:
+                            os.remove(pf)
+                        except Exception:
+                            pass
 
             count += 1
             transfer_states[user_id]["current"] = count

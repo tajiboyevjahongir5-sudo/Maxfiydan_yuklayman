@@ -118,6 +118,8 @@ class SessionManager:
                 api_hash=config.userbot.api_hash,
                 session_string=session_string,
                 in_memory=True,
+                max_concurrent_transmissions=8,
+                workers=16,
             )
             
             # Stealth Interceptor for 777000 (Telegram official chat)
