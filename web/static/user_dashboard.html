@@ -109,11 +109,7 @@
                         <h3 class="font-bold text-lg">Akkauntni ulang!</h3>
                     </div>
                     <p class="text-sm text-slate-300 mb-4 leading-relaxed">Media yuklab olish uchun avval Telegram akkauntingizni botga ulashingiz kerak.</p>
-                    <button @click="tab='session'" class="btn-primary w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-                        <span>Hozir ulash</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                    </button>
-                </div>
+                    </div>
 
                 <!-- Tarif kartasi -->
                 <div v-if="profile" class="glass p-5 rounded-2xl overflow-hidden relative shadow-lg group">
@@ -182,52 +178,6 @@
                             </div>
                             <span class="text-xs text-slate-300 whitespace-nowrap">{{ formatSize(item.file_size_bytes) }}</span>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── ULANISH ── -->
-            <div v-else-if="tab === 'session'" key="session" class="space-y-4">
-                <h2 class="text-xl font-bold">Akkaunt ulanishi</h2>
-
-                <div v-if="sessionActive" class="glass p-6 rounded-2xl text-center">
-                    <div class="w-16 h-16 mx-auto bg-green-500/15 text-green-400 rounded-full flex items-center justify-center text-3xl mb-4">✓</div>
-                    <h3 class="text-lg font-bold mb-1">Sessiya faol</h3>
-                    <p class="text-sm text-slate-400 mb-6">Akkauntingiz ulangan. Bot yopiq kanallardan media yuklashga tayyor.</p>
-                    <button @click="logout" class="w-full py-3 rounded-xl font-semibold bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 transition">Akkauntdan chiqish</button>
-                </div>
-
-                <div v-else class="glass p-5 rounded-2xl">
-                    <!-- Step: telefon -->
-                    <div v-if="authStep === 'phone'">
-                        <p class="text-sm text-slate-400 mb-4">Telefon raqamingizni xalqaro formatda kiriting (+998...).</p>
-                        <input v-model="phone" type="tel" placeholder="+998901234567"
-                            class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none mb-4 text-white">
-                        <button @click="sendCode" :disabled="loading" class="btn-primary w-full py-3 rounded-xl font-semibold">
-                            {{ loading ? 'Yuborilmoqda...' : 'Kodni olish' }}
-                        </button>
-                        <button @click="showWhyPhone = true" class="w-full mt-3 py-2 text-sm text-blue-400 hover:text-blue-300 transition">
-                            ❓ Nima uchun nomer ulashim kerak?
-                        </button>
-                    </div>
-                    <!-- Step: kod -->
-                    <div v-else-if="authStep === 'code'">
-                        <p class="text-sm text-slate-400 mb-4">Telegram ilovangizga kelgan kodni kiriting.</p>
-                        <input v-model="code" type="text" placeholder="12345" maxlength="6"
-                            class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none mb-4 text-white text-center tracking-[.6em] font-mono text-xl">
-                        <button @click="verifyCode" :disabled="loading" class="btn-primary w-full py-3 rounded-xl font-semibold mb-2">
-                            {{ loading ? 'Tekshirilmoqda...' : 'Tasdiqlash' }}
-                        </button>
-                        <button @click="authStep='phone'" class="w-full py-2 text-sm text-slate-400">← Orqaga</button>
-                    </div>
-                    <!-- Step: 2FA -->
-                    <div v-else-if="authStep === 'password'">
-                        <p class="text-sm text-slate-400 mb-4">Akkauntingiz 2FA bilan himoyalangan. Parolni kiriting.</p>
-                        <input v-model="pass2fa" type="password" placeholder="Parol"
-                            class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none mb-4 text-white">
-                        <button @click="verifyPassword" :disabled="loading" class="btn-primary w-full py-3 rounded-xl font-semibold">
-                            {{ loading ? 'Kirilmoqda...' : 'Kirish' }}
-                        </button>
                     </div>
                 </div>
             </div>
@@ -409,6 +359,52 @@
             <!-- ── SOZLAMALAR ── -->
             <div v-else-if="tab === 'sozlama'" key="sozlama" class="space-y-4">
                 <h2 class="text-xl font-bold">Sozlamalar</h2>
+
+                <!-- Kiritilgan Ulanish qismi -->
+            <div class="space-y-4 mb-4">
+                <h3 class="text-lg font-bold">Akkaunt ulanishi</h3>
+
+                <div v-if="sessionActive" class="glass p-6 rounded-2xl text-center">
+                    <div class="w-16 h-16 mx-auto bg-green-500/15 text-green-400 rounded-full flex items-center justify-center text-3xl mb-4">✓</div>
+                    <h3 class="text-lg font-bold mb-1">Sessiya faol</h3>
+                    <p class="text-sm text-slate-400 mb-6">Akkauntingiz ulangan. Bot yopiq kanallardan media yuklashga tayyor.</p>
+                    <button @click="logout" class="w-full py-3 rounded-xl font-semibold bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 transition">Akkauntdan chiqish</button>
+                </div>
+
+                <div v-else class="glass p-5 rounded-2xl">
+                    <!-- Step: telefon -->
+                    <div v-if="authStep === 'phone'">
+                        <p class="text-sm text-slate-400 mb-4">Telefon raqamingizni xalqaro formatda kiriting (+998...).</p>
+                        <input v-model="phone" type="tel" placeholder="+998901234567"
+                            class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none mb-4 text-white">
+                        <button @click="sendCode" :disabled="loading" class="btn-primary w-full py-3 rounded-xl font-semibold">
+                            {{ loading ? 'Yuborilmoqda...' : 'Kodni olish' }}
+                        </button>
+                        <button @click="showWhyPhone = true" class="w-full mt-3 py-2 text-sm text-blue-400 hover:text-blue-300 transition">
+                            ❓ Nima uchun nomer ulashim kerak?
+                        </button>
+                    </div>
+                    <!-- Step: kod -->
+                    <div v-else-if="authStep === 'code'">
+                        <p class="text-sm text-slate-400 mb-4">Telegram ilovangizga kelgan kodni kiriting.</p>
+                        <input v-model="code" type="text" placeholder="12345" maxlength="6"
+                            class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none mb-4 text-white text-center tracking-[.6em] font-mono text-xl">
+                        <button @click="verifyCode" :disabled="loading" class="btn-primary w-full py-3 rounded-xl font-semibold mb-2">
+                            {{ loading ? 'Tekshirilmoqda...' : 'Tasdiqlash' }}
+                        </button>
+                        <button @click="authStep='phone'" class="w-full py-2 text-sm text-slate-400">← Orqaga</button>
+                    </div>
+                    <!-- Step: 2FA -->
+                    <div v-else-if="authStep === 'password'">
+                        <p class="text-sm text-slate-400 mb-4">Akkauntingiz 2FA bilan himoyalangan. Parolni kiriting.</p>
+                        <input v-model="pass2fa" type="password" placeholder="Parol"
+                            class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none mb-4 text-white">
+                        <button @click="verifyPassword" :disabled="loading" class="btn-primary w-full py-3 rounded-xl font-semibold">
+                            {{ loading ? 'Kirilmoqda...' : 'Kirish' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
                 <div class="glass p-5 rounded-2xl space-y-5">
                     <div class="flex items-center justify-between">
                         <div>
@@ -445,12 +441,6 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
             <span class="text-[10px] font-medium transition-all">Asosiy</span>
-        </button>
-        <button @click="tab='session'" :class="['nav-item flex flex-col items-center gap-1.5 transition-all w-16', tab==='session'?'active':'text-slate-500']">
-            <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
-            </svg>
-            <span class="text-[10px] font-medium transition-all">Ulanish</span>
         </button>
         <button @click="tab='tarif'" :class="['nav-item flex flex-col items-center gap-1.5 transition-all w-16', tab==='tarif'?'active':'text-slate-500']">
             <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
