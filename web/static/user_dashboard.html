@@ -2,7 +2,7 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Maxfiy Media Bot — Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -16,11 +16,23 @@
             --tg-secondary: #1e293b;
             --tg-hint: #94a3b8;
         }
+        html, body {
+            touch-action: manipulation;
+            -webkit-text-size-adjust: 100%;
+        }
         body { 
             background: var(--tg-bg); 
             color: var(--tg-text); 
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, sans-serif;
             -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        input, select, textarea {
+            font-size: 16px !important; /* iOS Safari avtomatik zoom qilmasligi uchun 16px */
+            touch-action: manipulation;
+            user-select: text;
+            -webkit-user-select: text;
         }
         
         /* Modern Glassmorphism Cards */
@@ -305,34 +317,56 @@
                         </div>
 
                         <div v-if="!transferState || transferState.status === 'none'">
-                            <div class="mb-4">
-                                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanaldan:</label>
-                                <select v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>Kanalni tanlang...</option>
-                                    <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
-                                </select>
+                            <!-- Kanallar yuklanayotgandagi spinner -->
+                            <div v-if="channelsLoading" class="py-8 text-center space-y-3">
+                                <div class="w-8 h-8 border-3 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+                                <p class="text-xs text-slate-400">Telegram kanallaringiz yuklanmoqda...</p>
                             </div>
 
-                            <div class="mb-4">
-                                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
-                                <select v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>Kanalni tanlang...</option>
-                                    <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
-                                </select>
+                            <!-- Kanallar topilmaganda yoki xatolikda -->
+                            <div v-else-if="channels.length === 0" class="py-6 text-center space-y-3 p-4 rounded-xl bg-slate-800/40 border border-slate-700/50">
+                                <p class="text-sm text-slate-300">Kanallar ro'yxati hali yuklanmadi yoki topilmadi.</p>
+                                <button @click="loadChannels" class="btn-primary px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5">
+                                    🔄 Kanallarni yuklash
+                                </button>
                             </div>
 
-                            <div class="mb-5">
-                                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Nimani ko'chiramiz:</label>
-                                <select v-model="transferType" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="all">Barchasi (Rasm + Video)</option>
-                                    <option value="photo">Faqat Rasmlar</option>
-                                    <option value="video">Faqat Videolar</option>
-                                </select>
-                            </div>
+                            <!-- Kanallar muvaffaqiyatli yuklanganda -->
+                            <div v-else>
+                                <div class="mb-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="block text-xs text-slate-400 uppercase tracking-wider">Qaysi kanaldan:</label>
+                                        <button @click="loadChannels" :disabled="channelsLoading" class="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium">
+                                            🔄 Yangilash
+                                        </button>
+                                    </div>
+                                    <select v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                        <option value="" disabled>Kanalni tanlang ({{ channels.length }} ta)...</option>
+                                        <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
+                                    </select>
+                                </div>
 
-                            <button @click="startTransfer" :disabled="!transferSource || !transferTarget || transferSource === transferTarget" class="btn-primary w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-                                🚀 Ko'chirishni boshlash
-                            </button>
+                                <div class="mb-4">
+                                    <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
+                                    <select v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                        <option value="" disabled>Kanalni tanlang ({{ channels.length }} ta)...</option>
+                                        <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-5">
+                                    <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Nimani ko'chiramiz:</label>
+                                    <select v-model="transferType" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                        <option value="all">Barchasi (Rasm + Video)</option>
+                                        <option value="photo">Faqat Rasmlar</option>
+                                        <option value="video">Faqat Videolar</option>
+                                    </select>
+                                </div>
+
+                                <button @click="startTransfer" :disabled="!transferSource || !transferTarget || transferSource === transferTarget" class="btn-primary w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                                    🚀 Ko'chirishni boshlash
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
@@ -500,6 +534,7 @@ createApp({
             
             // Transfer
             channels: [],
+            channelsLoading: false,
             transferSource: '',
             transferTarget: '',
             transferType: 'all',
@@ -550,6 +585,16 @@ createApp({
         }
     },
     async mounted() {
+        // iOS Safari / Telegram WebApp da 2 marta tez bosganda zoom bo'lishini to'xtatish
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (event) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 350) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
+
         const _tg = window.Telegram?.WebApp;
         if (_tg) {
             this.tg = Vue.markRaw(_tg);
@@ -581,13 +626,14 @@ createApp({
     },
     watch: {
         tab(newVal) {
-            if (newVal === 'transfer' && this.sessionActive && this.channels.length === 0) {
+            if (newVal === 'transfer' && this.channels.length === 0 && !this.channelsLoading) {
                 this.loadChannels();
             }
         }
     },
     methods: {
         async loadChannels() {
+            this.channelsLoading = true;
             try {
                 let res = await fetch('/api/user/channels', {
                     headers: { 'Authorization': `Bearer ${this.token}` }
@@ -612,6 +658,8 @@ createApp({
                 }
             } catch (e) {
                 console.error(e);
+            } finally {
+                this.channelsLoading = false;
             }
         },
         async startTransfer() {

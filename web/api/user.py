@@ -273,7 +273,7 @@ async def get_my_channels(user_id: int = Depends(get_current_user_id)):
     try:
         client = await userbot.get_client(user_id)
         channels = []
-        async for dialog in client.get_dialogs():
+        async for dialog in client.get_dialogs(limit=250):
             if dialog.chat and dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
                 channels.append(ChannelInfo(
                     id=dialog.chat.id, 
@@ -281,6 +281,7 @@ async def get_my_channels(user_id: int = Depends(get_current_user_id)):
                 ))
         return channels
     except Exception as e:
+        logger.error(f"❌ get_my_channels xatolik (User ID: {user_id}): {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 class TransferRequest(BaseModel):
