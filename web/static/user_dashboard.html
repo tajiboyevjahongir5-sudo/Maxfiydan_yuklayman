@@ -603,7 +603,12 @@ createApp({
                 if (res.ok) {
                     this.channels = await res.json();
                 } else {
-                    this.tg?.showAlert("Kanallarni yuklashda xato!");
+                    let msg = "Kanallarni yuklashda xato!";
+                    try {
+                        const d = await res.json();
+                        if (d.detail) msg = d.detail;
+                    } catch(e) {}
+                    this.tg?.showAlert(msg);
                 }
             } catch (e) {
                 console.error(e);

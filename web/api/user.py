@@ -271,16 +271,28 @@ async def get_my_channels(user_id: int = Depends(get_current_user_id)):
     from pyrogram.enums import ChatType
     
     try:
+        if user_id not in userbot.clients or not userbot.clients[user_id].is_connected:
+            from database import async_session, UserSession
+            from sqlalchemy import select
+            async with async_session() as db:
+                result = await db.execute(
+                    select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True)
+                )
+                session = result.scalar_one_or_none()
+                if session and session.session_string:
+                    await userbot.start_session(user_id, session.session_string)
+
         client = userbot.get_client(user_id)
         channels = []
-        async for dialog in client.get_dialogs():
-            if dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
+        async for dialog in client.get_dialogs(limit=200):
+            if dialog.chat and dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
                 channels.append(ChannelInfo(
                     id=dialog.chat.id, 
                     title=dialog.chat.title or 'Nomsiz Kanal'
                 ))
         return channels
     except Exception as e:
+        logger.error(f"get_my_channels error (User {user_id}): {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 class TransferRequest(BaseModel):
@@ -296,6 +308,17 @@ async def start_transfer(req: TransferRequest, user_id: int = Depends(get_curren
     import asyncio
     
     try:
+        if user_id not in userbot.clients or not userbot.clients[user_id].is_connected:
+            from database import async_session, UserSession
+            from sqlalchemy import select
+            async with async_session() as db:
+                result = await db.execute(
+                    select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True)
+                )
+                session = result.scalar_one_or_none()
+                if session and session.session_string:
+                    await userbot.start_session(user_id, session.session_string)
+
         client = userbot.get_client(user_id)
         # Orqa fonda (background) ko'chirishni boshlash
         asyncio.create_task(run_transfer(
@@ -307,6 +330,7 @@ async def start_transfer(req: TransferRequest, user_id: int = Depends(get_curren
         ))
         return {'status': 'ok', 'message': "Tayyorlanmoqda..."}
     except Exception as e:
+        logger.error(f"start_transfer error (User {user_id}): {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get('/transfer/status')
