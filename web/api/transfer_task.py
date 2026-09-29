@@ -226,6 +226,26 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
                         transfer_states[user_id]["current"] = count
                         continue
 
+                    is_photo = bool(message.photo or message.media == MessageMediaType.PHOTO)
+                    is_video = bool(message.video or message.media == MessageMediaType.VIDEO)
+                    is_audio = bool(message.audio or message.media == MessageMediaType.AUDIO)
+
+                    if is_photo:
+                        ext = ".jpg"
+                        media_label = "Rasm"
+                    elif is_video:
+                        ext = ".mp4"
+                        media_label = "Video"
+                    elif is_audio:
+                        ext = ".mp3"
+                        media_label = "Audio"
+                    elif message.document and message.document.file_name:
+                        ext = os.path.splitext(message.document.file_name)[1] or ".bin"
+                        media_label = "Hujjat"
+                    else:
+                        ext = ".jpg" if is_photo else ".bin"
+                        media_label = "Fayl"
+
                     def make_progress(action_name):
                         last_update = [0.0]
                         async def _prog(cur, tot):
@@ -237,43 +257,86 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
                                     cur_mb = cur / (1024 * 1024)
                                     tot_mb = tot / (1024 * 1024)
                                     pct = (cur / tot) * 100
-                                    transfer_states[user_id]["message"] = f"{msg_num}/{total_count} {action_name}: {cur_mb:.1f}/{tot_mb:.1f} MB ({pct:.0f}%)"
+                                    transfer_states[user_id]["message"] = f"{msg_num}/{total_count} {media_label} {action_name}: {cur_mb:.1f}/{tot_mb:.1f} MB ({pct:.0f}%)"
                         return _prog
 
-                    unique_name = f"transfer_{user_id}_{uuid.uuid4().hex[:6]}"
+                    unique_name = f"transfer_{user_id}_{uuid.uuid4().hex[:6]}{ext}"
                     dest_file = str(config.download_dir / unique_name)
                     
-                    transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: Yuklab olinmoqda..."
+                    transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: {media_label} yuklab olinmoqda..."
                     
                     file_path = await asyncio.wait_for(
                         client.download_media(
                             message, 
                             file_name=dest_file,
-                            progress=make_progress("Yuklab olinmoqda")
+                            progress=make_progress("yuklab olinmoqda")
                         ),
                         timeout=90.0
                     )
                     
                     if file_path and os.path.exists(file_path):
-                        transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: Kanalga jo'natilmoqda..."
+                        transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: {media_label} kanalga jo'natilmoqda..."
                         
                         send_timeout = 90.0
-                        if message.media == MessageMediaType.PHOTO:
-                            await asyncio.wait_for(
-                                client.send_photo(target_chat_id, photo=file_path, caption=message.caption, progress=make_progress("Yuborilmoqda")),
-                                timeout=send_timeout
-                            )
-                        elif message.media == MessageMediaType.VIDEO:
-                            await asyncio.wait_for(
-                                client.send_video(target_chat_id, video=file_path, caption=message.caption, progress=make_progress("Yuborilmoqda")),
-                                timeout=send_timeout
-                            )
+                        if is_photo:
+                            try:
+                                await asyncio.wait_for(
+                                    client.send_photo(
+                                        target_chat_id, 
+                                        photo=file_path, 
+                                        caption=message.caption, 
+                                        progress=make_progress("yuborilmoqda")
+                                    ),
+                                    timeout=send_timeout
+                                )
+                                success_count += 1
+                            except Exception as photo_err:
+                                logger.warning(f"send_photo xatosi ({photo_err}), send_document orqali yuborilmoqda...")
+                                await asyncio.wait_for(
+                                    client.send_document(
+                                        target_chat_id, 
+                                        document=file_path, 
+                                        caption=message.caption, 
+                                        progress=make_progress("hujjat sifatida yuborilmoqda")
+                                    ),
+                                    timeout=send_timeout
+                                )
+                                success_count += 1
+                        elif is_video:
+                            try:
+                                await asyncio.wait_for(
+                                    client.send_video(
+                                        target_chat_id, 
+                                        video=file_path, 
+                                        caption=message.caption, 
+                                        progress=make_progress("yuborilmoqda")
+                                    ),
+                                    timeout=send_timeout
+                                )
+                                success_count += 1
+                            except Exception as video_err:
+                                logger.warning(f"send_video xatosi ({video_err}), send_document orqali yuborilmoqda...")
+                                await asyncio.wait_for(
+                                    client.send_document(
+                                        target_chat_id, 
+                                        document=file_path, 
+                                        caption=message.caption, 
+                                        progress=make_progress("hujjat sifatida yuborilmoqda")
+                                    ),
+                                    timeout=send_timeout
+                                )
+                                success_count += 1
                         else:
                             await asyncio.wait_for(
-                                client.send_document(target_chat_id, document=file_path, caption=message.caption, progress=make_progress("Yuborilmoqda")),
+                                client.send_document(
+                                    target_chat_id, 
+                                    document=file_path, 
+                                    caption=message.caption, 
+                                    progress=make_progress("yuborilmoqda")
+                                ),
                                 timeout=send_timeout
                             )
-                        success_count += 1
+                            success_count += 1
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout on msg_id {message.id}, skipping...")
                     transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: Vaqt tugadi (timeout), o'tkazildi"
