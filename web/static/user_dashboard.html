@@ -316,9 +316,9 @@
                             <div class="mb-4">
                                 <div class="flex items-center justify-between mb-2">
                                     <label class="block text-xs text-slate-400 uppercase tracking-wider">Qaysi kanaldan:</label>
-                                    <button @click="loadChannels" type="button" class="text-xs text-blue-400 hover:text-blue-300">🔄 Yangilash</button>
+                                    <button @click="loadChannels(true)" type="button" class="text-xs text-blue-400 hover:text-blue-300">🔄 Yangilash</button>
                                 </div>
-                                <select v-model="transferSource" @focus="channels.length === 0 && loadChannels()" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                <select v-model="transferSource" @focus="channels.length === 0 && loadChannels(true)" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
                                     <option value="" disabled>{{ loadingChannels ? 'Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang...' : 'Kanallar yuklanmadi (bosing)') }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
@@ -326,7 +326,7 @@
 
                             <div class="mb-4">
                                 <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
-                                <select v-model="transferTarget" @focus="channels.length === 0 && loadChannels()" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                <select v-model="transferTarget" @focus="channels.length === 0 && loadChannels(true)" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
                                     <option value="" disabled>{{ loadingChannels ? 'Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang...' : 'Kanallar yuklanmadi (bosing)') }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
@@ -585,24 +585,23 @@ createApp({
         }
 
         if (this.token) {
-            await this.loadProfile();
-            // Sessiya faolligini tekshirish
-            await this.checkSession();
-            if (this.tab === 'transfer' && this.channels.length === 0) {
-                this.loadChannels();
-            }
+            this.loadProfile();
+            this.checkSession();
+            // WebApp ga kirish bilan kanallarni darhol fonda yuklab qo'yish!
+            this.loadChannels(false);
         }
         await this.loadTariffs();
     },
     watch: {
         tab(newVal) {
             if (newVal === 'transfer' && this.channels.length === 0) {
-                this.loadChannels();
+                this.loadChannels(false);
             }
         }
     },
     methods: {
-        async loadChannels() {
+        async loadChannels(showAlertOnError = false) {
+            if (!this.token) return;
             if (this.loadingChannels) return;
             this.loadingChannels = true;
             try {
@@ -611,7 +610,7 @@ createApp({
                 });
                 if (res.ok) {
                     this.channels = await res.json();
-                } else {
+                } else if (showAlertOnError) {
                     let msg = "Kanallarni yuklashda xato!";
                     try {
                         const d = await res.json();
@@ -621,6 +620,9 @@ createApp({
                 }
             } catch (e) {
                 console.error(e);
+                if (showAlertOnError) {
+                    this.tg?.showAlert("Serverga ulanishda xato!");
+                }
             } finally {
                 this.loadingChannels = false;
             }
