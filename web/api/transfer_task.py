@@ -17,6 +17,15 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
     transfer_states[user_id] = {"total": 0, "current": 0, "status": "initializing", "message": "Tayyorlanmoqda..."}
     
     try:
+        # Peer xatosi (PEER_ID_INVALID) ning oldini olish uchun bazani qizdirish
+        try:
+            await client.get_chat(source_chat_id)
+            await client.get_chat(target_chat_id)
+        except Exception:
+            logger.info(f"Peer topilmadi, dialoglar yuklanmoqda (User {user_id})...")
+            async for _ in client.get_dialogs():
+                pass
+
         # Filtrni tanlash
         if media_type == "photo":
             filter_type = MessagesFilter.PHOTO
