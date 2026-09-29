@@ -328,8 +328,8 @@
             </div>
 
             <!-- ── KO'CHIRISH ── -->
-            <div v-else-if="tab === 'transfer'" key="transfer" class="space-y-4">
-                <div class="glass p-5 rounded-2xl">
+            <div v-else-if="tab === 'transfer'" key="transfer" class="space-y-4 animate-fade-in-up">
+                <div class="glass p-5 rounded-2xl relative overflow-hidden">
                     <h2 class="text-xl font-bold mb-1">Kanaldan ko'chirish</h2>
                     <p class="text-sm text-slate-400 mb-5">Bir kanaldagi barcha materiallarni boshqasiga o'tkazish.</p>
 
@@ -337,37 +337,71 @@
                         Kanallarni ko'rish uchun avval ulanish bo'limidan akkauntingizni ulang!
                     </div>
 
-                    <div v-else>
-                        <div class="mb-4">
-                            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanaldan:</label>
-                            <select v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                <option value="" disabled>Kanalni tanlang...</option>
-                                <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
-                            </select>
+                    <!-- Kiritish / Form holati -->
+                    <div v-else-if="!transferState || transferState.status === 'none' || transferState.status === 'error' || transferState.status === 'completed'">
+                        
+                        <!-- Muvaffaqiyatli xabar (Completed Animation) -->
+                        <div v-if="transferState?.status === 'completed'" class="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center animate-fade-in-up">
+                            <div class="w-16 h-16 mx-auto bg-green-500/20 text-green-400 rounded-full flex items-center justify-center text-3xl mb-2 animate-bounce">✨</div>
+                            <h3 class="text-green-400 font-bold mb-1">Muvaffaqiyatli Yakunlandi!</h3>
+                            <p class="text-xs text-green-300/80">{{ transferState.message }}</p>
+                            <button @click="resetTransfer" class="mt-4 text-xs bg-slate-800 px-4 py-2 rounded-lg text-white">Yangi ko'chirish</button>
+                        </div>
+                        
+                        <!-- Xatolik xabari -->
+                        <div v-if="transferState?.status === 'error'" class="mb-6 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+                            <p class="text-xs text-red-400">{{ transferState.message }}</p>
+                            <button @click="resetTransfer" class="mt-2 text-xs bg-slate-800 px-4 py-1.5 rounded-lg text-white">Qayta urinish</button>
                         </div>
 
-                        <div class="mb-4">
-                            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
-                            <select v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                <option value="" disabled>Kanalni tanlang...</option>
-                                <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
-                            </select>
-                        </div>
+                        <div v-if="!transferState || transferState.status === 'none'">
+                            <div class="mb-4">
+                                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanaldan:</label>
+                                <select v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="" disabled>Kanalni tanlang...</option>
+                                    <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
+                                </select>
+                            </div>
 
-                        <div class="mb-5">
-                            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Nimani ko'chiramiz:</label>
-                            <select v-model="transferType" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                <option value="all">Barchasi (Rasm + Video)</option>
-                                <option value="photo">Faqat Rasmlar</option>
-                                <option value="video">Faqat Videolar</option>
-                            </select>
-                        </div>
+                            <div class="mb-4">
+                                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
+                                <select v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="" disabled>Kanalni tanlang...</option>
+                                    <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
+                                </select>
+                            </div>
 
-                        <button @click="startTransfer" :disabled="!transferSource || !transferTarget || transferSource === transferTarget || isTransferring" class="btn-primary w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-                            <span v-if="isTransferring">⏳ Ko'chirilmoqda...</span>
-                            <span v-else>🚀 Ko'chirishni boshlash</span>
-                        </button>
-                        <p v-if="transferMessage" class="mt-3 text-center text-sm text-green-400">{{ transferMessage }}</p>
+                            <div class="mb-5">
+                                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Nimani ko'chiramiz:</label>
+                                <select v-model="transferType" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="all">Barchasi (Rasm + Video)</option>
+                                    <option value="photo">Faqat Rasmlar</option>
+                                    <option value="video">Faqat Videolar</option>
+                                </select>
+                            </div>
+
+                            <button @click="startTransfer" :disabled="!transferSource || !transferTarget || transferSource === transferTarget" class="btn-primary w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                                🚀 Ko'chirishni boshlash
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress (Yuklanmoqda) holati -->
+                    <div v-else class="text-center py-4">
+                        <div class="w-16 h-16 mx-auto border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                        <h3 class="font-bold text-lg mb-1">{{ transferState.message }}</h3>
+                        
+                        <div v-if="transferState.total > 0">
+                            <p class="text-sm text-slate-400 mb-3">Ko'chirildi: <span class="font-mono text-white">{{ transferState.current }}</span> / <span class="font-mono">{{ transferState.total }}</span></p>
+                            
+                            <div class="w-full bg-slate-800 rounded-full h-3 mb-2 shadow-inner p-0.5">
+                                <div class="bg-gradient-to-r from-blue-400 to-indigo-500 h-2 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(99,102,241,0.6)]" :style="{width: ((transferState.current / transferState.total) * 100) + '%'}"></div>
+                            </div>
+                            <p class="text-xs text-slate-500 text-right">{{ ((transferState.current / transferState.total) * 100).toFixed(1) }}%</p>
+                        </div>
+                        <div v-else class="text-sm text-slate-400">
+                            Fayllar sanalmoqda...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -481,6 +515,8 @@ createApp({
             transferType: 'all',
             isTransferring: false,
             transferMessage: '',
+            transferState: null,
+            transferPollTimer: null,
             loading: false,
 
             // Tariffs
@@ -576,7 +612,7 @@ createApp({
         async startTransfer() {
             if (!this.transferSource || !this.transferTarget) return;
             this.isTransferring = true;
-            this.transferMessage = "";
+            this.transferState = { status: 'initializing', message: 'Tayyorlanmoqda...', current: 0, total: 0 };
             try {
                 const res = await fetch('/api/user/transfer', {
                     method: 'POST',
@@ -587,19 +623,45 @@ createApp({
                         media_type: this.transferType
                     })
                 });
-                const data = await res.json();
                 if (res.ok) {
-                    this.transferMessage = data.message;
-                    this.tg?.showAlert("Ko'chirish boshlandi!");
+                    this.tg?.HapticFeedback?.notificationOccurred('success');
+                    this.startTransferPoll();
                 } else {
-                    this.transferMessage = "Xato: " + data.detail;
-                    this.tg?.showAlert("Xato yuz berdi: " + data.detail);
+                    const data = await res.json();
+                    this.transferState = { status: 'error', message: data.detail || 'Xato yuz berdi' };
                 }
             } catch (e) {
-                this.transferMessage = "Ulanishda xato!";
+                this.transferState = { status: 'error', message: 'Ulanishda xato!' };
             } finally {
                 this.isTransferring = false;
             }
+        },
+        startTransferPoll() {
+            if (this.transferPollTimer) clearInterval(this.transferPollTimer);
+            this.transferPollTimer = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/user/transfer/status', {
+                        headers: { 'Authorization': `Bearer ${this.token}` }
+                    });
+                    if (res.ok) {
+                        const state = await res.json();
+                        if (state.status !== 'none') {
+                            this.transferState = state;
+                            if (state.status === 'completed' || state.status === 'error') {
+                                clearInterval(this.transferPollTimer);
+                                if (state.status === 'completed') this.tg?.HapticFeedback?.notificationOccurred('success');
+                                else this.tg?.HapticFeedback?.notificationOccurred('error');
+                            }
+                        }
+                    }
+                } catch (e) {}
+            }, 1500);
+        },
+        resetTransfer() {
+            this.transferState = null;
+            this.transferSource = '';
+            this.transferTarget = '';
+            if (this.transferPollTimer) clearInterval(this.transferPollTimer);
         },
         async startDownload() {
             if (!this.downloadLink) return;

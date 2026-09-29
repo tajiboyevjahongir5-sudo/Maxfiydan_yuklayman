@@ -299,11 +299,20 @@ async def start_transfer(req: TransferRequest, user_id: int = Depends(get_curren
         client = userbot.get_client(user_id)
         # Orqa fonda (background) ko'chirishni boshlash
         asyncio.create_task(run_transfer(
+            user_id,
             client, 
             req.source_chat_id, 
             req.target_chat_id, 
             req.media_type
         ))
-        return {'status': 'ok', 'message': "Ko'chirish boshlandi. Bu jarayon fonda davom etadi!"}
+        return {'status': 'ok', 'message': "Tayyorlanmoqda..."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get('/transfer/status')
+async def get_transfer_status(user_id: int = Depends(get_current_user_id)):
+    from web.api.transfer_task import transfer_states
+    state = transfer_states.get(user_id)
+    if not state:
+        return {"status": "none"}
+    return state
