@@ -270,6 +270,7 @@ _channels_cache: dict = {}
 async def get_my_channels(user_id: int = Depends(get_current_user_id)):
     """Userga tegishli (ulangan) kanal va guruhlar ro'yxatini qaytaradi."""
     import time
+    import asyncio
     from userbot import userbot
     from pyrogram.enums import ChatType
 
@@ -288,19 +289,46 @@ async def get_my_channels(user_id: int = Depends(get_current_user_id)):
                     select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True)
                 )
                 session = result.scalar_one_or_none()
-                if session and session.session_string:
-                    await userbot.start_session(user_id, session.session_string)
+                if not session or not session.session_string:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Telegram akkauntingiz ulanmagan. Iltimos, Sozlamalar bo'limidan akkauntingizni ulang."
+                    )
+                try:
+                    await asyncio.wait_for(userbot.start_session(user_id, session.session_string), timeout=10.0)
+                except asyncio.TimeoutError:
+                    raise HTTPException(
+                        status_code=408, 
+                        detail="Telegram akkauntingizga ulanishda vaqt tugadi. Qaytadan urinib ko'ring."
+                    )
 
         client = userbot.get_client(user_id)
-        channels = []
-        async for dialog in client.get_dialogs(limit=60):
-            if dialog.chat and dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
-                channels.append(ChannelInfo(
-                    id=dialog.chat.id, 
-                    title=dialog.chat.title or 'Nomsiz Kanal'
-                ))
+        
+        async def _fetch_dialogs():
+            ch_list = []
+            async for dialog in client.get_dialogs(limit=50):
+                if dialog.chat and dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
+                    ch_list.append(ChannelInfo(
+                        id=dialog.chat.id, 
+                        title=dialog.chat.title or 'Nomsiz Kanal'
+                    ))
+            return ch_list
+
+        try:
+            channels = await asyncio.wait_for(_fetch_dialogs(), timeout=8.0)
+        except asyncio.TimeoutError:
+            logger.warning(f"get_dialogs timeout for user {user_id}")
+            if user_id in _channels_cache and _channels_cache[user_id][1]:
+                return _channels_cache[user_id][1]
+            raise HTTPException(
+                status_code=408,
+                detail="Kanallarni olishda Telegram javob bermadi. Iltimos qaytadan 'Yangilash' tugmasini bosing."
+            )
+
         _channels_cache[user_id] = (time.time(), channels)
         return channels
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"get_my_channels error (User {user_id}): {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))

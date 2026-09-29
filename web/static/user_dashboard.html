@@ -291,8 +291,12 @@
                     <h2 class="text-xl font-bold mb-1">Kanaldan ko'chirish</h2>
                     <p class="text-sm text-slate-400 mb-5">Bir kanaldagi barcha materiallarni boshqasiga o'tkazish.</p>
 
-                    <div v-if="!sessionActive" class="text-sm text-red-400 mb-4">
-                        Kanallarni ko'rish uchun avval ulanish bo'limidan akkauntingizni ulang!
+                    <div v-if="!sessionActive" class="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl mb-4 flex items-center justify-between">
+                        <div>
+                            <p class="font-bold text-amber-300">⚠️ Akkaunt ulanmagan</p>
+                            <p class="text-xs text-amber-400/80">Kanallarni ko'rish va ko'chirish uchun avval akkauntingizni ulang.</p>
+                        </div>
+                        <button @click="tab='sozlama'" class="text-xs bg-amber-500 text-slate-900 px-3 py-1.5 rounded-lg font-bold hover:bg-amber-400 transition">Ulash</button>
                     </div>
 
                     <!-- Kiritish / Form holati -->
@@ -316,18 +320,20 @@
                             <div class="mb-4">
                                 <div class="flex items-center justify-between mb-2">
                                     <label class="block text-xs text-slate-400 uppercase tracking-wider">Qaysi kanaldan:</label>
-                                    <button @click="loadChannels(true)" type="button" class="text-xs text-blue-400 hover:text-blue-300">🔄 Yangilash</button>
+                                    <button @click="loadChannels(true)" type="button" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                                        <span :class="{'animate-spin inline-block': loadingChannels}">🔄</span> Yangilash
+                                    </button>
                                 </div>
-                                <select v-model="transferSource" @focus="channels.length === 0 && loadChannels(true)" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>{{ channels.length ? 'Kanalni tanlang (' + channels.length + ' ta)...' : (loadingChannels ? 'Kanallar yuklanmoqda...' : 'Kanalni tanlang...') }}</option>
+                                <select v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="" disabled>{{ loadingChannels ? '⏳ Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang (' + channels.length + ' ta)...' : (!sessionActive ? '⚠️ Avval akkauntni ulang' : 'Kanal topilmadi (🔄 Yangilashni bosing)')) }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
                             </div>
 
                             <div class="mb-4">
                                 <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
-                                <select v-model="transferTarget" @focus="channels.length === 0 && loadChannels(true)" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>{{ channels.length ? 'Kanalni tanlang (' + channels.length + ' ta)...' : (loadingChannels ? 'Kanallar yuklanmoqda...' : 'Kanalni tanlang...') }}</option>
+                                <select v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="" disabled>{{ loadingChannels ? '⏳ Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang (' + channels.length + ' ta)...' : (!sessionActive ? '⚠️ Avval akkauntni ulang' : 'Kanal topilmadi (🔄 Yangilashni bosing)')) }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
                             </div>
@@ -597,7 +603,7 @@ createApp({
     },
     watch: {
         tab(newVal) {
-            if (newVal === 'transfer' && this.channels.length === 0) {
+            if (newVal === 'transfer' && this.channels.length === 0 && this.sessionActive) {
                 this.loadChannels(false);
             }
         }
@@ -616,13 +622,19 @@ createApp({
                     try {
                         localStorage.setItem('cached_channels', JSON.stringify(this.channels));
                     } catch(e) {}
-                } else if (showAlertOnError) {
-                    let msg = "Kanallarni yuklashda xato!";
-                    try {
-                        const d = await res.json();
-                        if (d.detail) msg = d.detail;
-                    } catch(e) {}
-                    this.tg?.showAlert(msg);
+                } else {
+                    if (res.status === 400 || res.status === 401) {
+                        this.channels = [];
+                        localStorage.removeItem('cached_channels');
+                    }
+                    if (showAlertOnError) {
+                        let msg = "Kanallarni yuklashda xato!";
+                        try {
+                            const d = await res.json();
+                            if (d.detail) msg = d.detail;
+                        } catch(e) {}
+                        this.tg?.showAlert(msg);
+                    }
                 }
             } catch (e) {
                 console.error(e);
@@ -769,8 +781,11 @@ createApp({
                 if (res.ok) {
                     const d = await res.json();
                     this.sessionActive = d.is_active === true;
-                    if (this.sessionActive && this.tab === 'transfer' && this.channels.length === 0) {
-                        this.loadChannels();
+                    if (this.sessionActive && this.channels.length === 0) {
+                        this.loadChannels(false);
+                    } else if (!this.sessionActive) {
+                        this.channels = [];
+                        localStorage.removeItem('cached_channels');
                     }
                 }
             } catch {}
@@ -899,6 +914,7 @@ createApp({
                     this.sessionActive = true;
                     this.tab = 'home';
                     this.tg?.showAlert("✅ Akkaunt muvaffaqiyatli ulandi!");
+                    this.loadChannels(false);
                 } else if (d.status === '2fa_required') {
                     this.authStep = 'password';
                 } else { this.tg?.showAlert(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail) || "Xato"); }
@@ -918,6 +934,7 @@ createApp({
                     this.sessionActive = true;
                     this.tab = 'home';
                     this.tg?.showAlert("✅ Akkaunt ulandi!");
+                    this.loadChannels(false);
                 } else {
                     let errMsg = "Xato yuz berdi";
                     if (d.detail) errMsg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);

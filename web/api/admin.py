@@ -16,6 +16,9 @@ class SessionOut(BaseModel):
     stealth_mode: bool
     proxy_id: Optional[int]
 
+    class Config:
+        from_attributes = True
+
 @router.get("/sessions", response_model=List[SessionOut])
 async def get_all_sessions():
     async with async_session() as db:
