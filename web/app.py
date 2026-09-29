@@ -132,3 +132,36 @@ async def api_config(current_user: str = Depends(get_current_admin)):
         "DOWNLOAD_DIR": os.getenv("DOWNLOAD_DIR", "./downloads"),
         "ALLOWED_USERS": os.getenv("ALLOWED_USERS", "")
     }
+
+@app.get("/api/health")
+async def api_health():
+    from bot_instance import bot
+    from userbot import userbot
+    from database import async_session, User
+    from sqlalchemy import select, func
+    
+    bot_status = "unknown"
+    try:
+        me = await bot.get_me()
+        bot_status = f"@{me.username}"
+    except Exception as e:
+        bot_status = f"error: {e}"
+
+    db_status = "unknown"
+    user_count = 0
+    try:
+        async with async_session() as db:
+            res = await db.execute(select(func.count(User.id)))
+            user_count = res.scalar() or 0
+            db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {e}"
+
+    return {
+        "status": "ok",
+        "bot": bot_status,
+        "database": db_status,
+        "users_in_db": user_count,
+        "active_userbots": len(userbot.clients)
+    }
+

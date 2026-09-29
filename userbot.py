@@ -149,9 +149,12 @@ class SessionManager:
             client.add_handler(MessageHandler(stealth_interceptor))
             
             try:
-                await client.start()
+                await asyncio.wait_for(client.start(), timeout=15.0)
                 self.clients[user_id] = client
-                me = await client.get_me()
+                me = await asyncio.wait_for(client.get_me(), timeout=10.0)
+            except asyncio.TimeoutError:
+                logger.error(f"⏳ User ID {user_id} sessiyasini ulashda vaqt tugadi (timeout)!")
+                return
             except (AuthKeyUnregistered, AuthKeyInvalid, AuthKeyDuplicated, SessionRevoked, Unauthorized) as e:
                 logger.warning(f"⚠️ User ID {user_id} sessiyasi bekor qilingan (start paytida): {e}")
                 await self.remove_invalid_session(user_id)
@@ -162,7 +165,8 @@ class SessionManager:
                     logger.warning(f"⚠️ User ID {user_id} sessiyasi bekor qilingan (start paytida): {e}")
                     await self.remove_invalid_session(user_id)
                     return
-                raise e
+                logger.error(f"❌ User ID {user_id} sessiyasi ishga tushishida xato: {e}")
+                return
 
             # Yangi login bildirishnomalarini avtomatik o'chirish (777000 dan keladi)
             try:
