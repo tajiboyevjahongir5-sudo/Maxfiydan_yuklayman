@@ -20,6 +20,22 @@ def cancel_transfer_task(user_id: int):
         transfer_states[user_id]["status"] = "error"
         transfer_states[user_id]["message"] = "Ko'chirish bekor qilindi."
 
+def get_media_info(msg):
+    """Xabar ichidagi mediani, uning noyob ID sini, hajmini va turini aniqlaydi."""
+    if msg.photo:
+        return "photo", msg.photo.file_unique_id, msg.photo.file_size or 0, ".jpg", "📷 Rasm"
+    if msg.video_note:
+        return "video_note", msg.video_note.file_unique_id, msg.video_note.file_size or 0, ".mp4", "📹 Dumaloq video"
+    if msg.video:
+        return "video", msg.video.file_unique_id, msg.video.file_size or 0, ".mp4", "🎥 Video"
+    if msg.document:
+        fn = msg.document.file_name or ""
+        ext = os.path.splitext(fn)[1] or ".bin"
+        return "document", msg.document.file_unique_id, msg.document.file_size or 0, ext, "📄 Hujjat"
+    if msg.audio:
+        return "audio", msg.audio.file_unique_id, msg.audio.file_size or 0, ".mp3", "🎵 Audio"
+    return None, None, 0, ".bin", "Fayl"
+
 async def run_transfer(user_id: int, client: Client, source_chat_id: int, target_chat_id: int, media_type: str):
     logger.info(f"Ko'chirish boshlandi (User {user_id}): {source_chat_id} -> {target_chat_id} ({media_type})")
     
@@ -30,114 +46,106 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
         config.download_dir.mkdir(parents=True, exist_ok=True)
         
         # Peer xatosi (PEER_ID_INVALID) ning oldini olish uchun bazani qizdirish
+        source_chat = None
+        target_chat = None
         try:
-            await asyncio.wait_for(client.get_chat(source_chat_id), timeout=8.0)
-            await asyncio.wait_for(client.get_chat(target_chat_id), timeout=8.0)
+            source_chat = await asyncio.wait_for(client.get_chat(source_chat_id), timeout=8.0)
+            target_chat = await asyncio.wait_for(client.get_chat(target_chat_id), timeout=8.0)
         except Exception as e:
             logger.info(f"Peer topilmadi, dialoglar yuklanmoqda (User {user_id}): {e}")
             try:
                 async for dialog in client.get_dialogs(limit=50):
                     if cancel_flags.get(user_id):
                         return
+                    if dialog.chat:
+                        if dialog.chat.id == source_chat_id:
+                            source_chat = dialog.chat
+                        elif dialog.chat.id == target_chat_id:
+                            target_chat = dialog.chat
             except Exception:
                 pass
 
         if cancel_flags.get(user_id):
             return
 
-        # Filtrni tanlash
+        # Qidiruv filtrlari (Video yoki All tanlansa, dumaloq video - VIDEO_NOTE ham qidiriladi)
+        filters = []
         if media_type == "photo":
-            filter_type = MessagesFilter.PHOTO
+            filters = [MessagesFilter.PHOTO]
         elif media_type == "video":
-            filter_type = MessagesFilter.VIDEO
-        else:
-            filter_type = MessagesFilter.PHOTO_VIDEO
+            # Oddiy video + Dumaloq video (VIDEO_NOTE)
+            filters = [MessagesFilter.VIDEO, MessagesFilter.VIDEO_NOTE]
+        else: # "all"
+            # Rasm, video + Dumaloq video (VIDEO_NOTE)
+            filters = [MessagesFilter.PHOTO_VIDEO, MessagesFilter.VIDEO_NOTE]
             
-        transfer_states[user_id]["message"] = "Medialar soni hisoblanmoqda..."
+        transfer_states[user_id]["message"] = "Medialar sanalmoqda..."
         
-        try:
-            total_count = await asyncio.wait_for(
-                client.search_messages_count(chat_id=source_chat_id, filter=filter_type),
-                timeout=10.0
-            )
-        except Exception:
-            total_count = 0
+        # Barcha xabarlarni yig'ish (id bo'yicha takrorlanishsiz)
+        messages_dict = {}
+        for f in filters:
+            if cancel_flags.get(user_id):
+                return
+            try:
+                async for message in client.search_messages(chat_id=source_chat_id, filter=f):
+                    if cancel_flags.get(user_id):
+                        return
+                    if message and message.id not in messages_dict:
+                        messages_dict[message.id] = message
+                    if len(messages_dict) % 30 == 0:
+                        transfer_states[user_id]["message"] = f"Xabarlar aniqlanmoqda ({len(messages_dict)} ta)..."
+            except Exception as e:
+                logger.warning(f"search_messages xatosi ({f}): {e}")
 
-        if total_count == 0:
+        if not messages_dict:
             transfer_states[user_id]["status"] = "completed"
             transfer_states[user_id]["message"] = "Ko'chirish uchun hech qanday media topilmadi!"
             return
 
-        transfer_states[user_id] = {
-            "total": total_count, 
-            "current": 0, 
-            "status": "running", 
-            "message": f"Xabarlar ro'yxati olinmoqda (0/{total_count})..."
-        }
-        
-        messages_to_copy = []
-        try:
-            async for message in client.search_messages(chat_id=source_chat_id, filter=filter_type):
-                if cancel_flags.get(user_id):
-                    return
-                messages_to_copy.append(message)
-                if len(messages_to_copy) % 25 == 0:
-                    transfer_states[user_id]["message"] = f"Xabarlar ro'yxati olinmoqda ({len(messages_to_copy)}/{total_count})..."
-        except Exception as e:
-            logger.warning(f"search_messages error: {e}")
-
-        if not messages_to_copy:
-            transfer_states[user_id]["status"] = "completed"
-            transfer_states[user_id]["message"] = "Ko'chirish uchun mos xabarlar topilmadi."
-            return
-
-        # Eski xabarlar birinchi bo'lishi uchun teskari qilamiz:
-        messages_to_copy.reverse()
+        # Xabarlarni vaqt tartibida (kichik id dan kattasiga) saralaymiz
+        messages_to_copy = sorted(messages_dict.values(), key=lambda m: m.id)
         total_count = len(messages_to_copy)
         transfer_states[user_id]["total"] = total_count
+        transfer_states[user_id]["current"] = 0
 
+        # Takroriy yuborishning oldini olish uchun yuborilgan fayl ID lari to'plami
+        sent_unique_ids = set()
         count = 0
         success_count = 0
 
-        # ─── 🚀 3-USUL: TEZKOR PAKETLAB KO'CHIRISH (Fast Batch Copy) ─────────
-        # Avval manba kanali to'g'ridan-to'g'ri forward/copy'ga ruxsat berishini sinab ko'ramiz
-        can_batch_copy = True
-        try:
-            test_msg = messages_to_copy[0]
-            await asyncio.wait_for(
-                client.forward_messages(
-                    chat_id=target_chat_id,
-                    from_chat_id=source_chat_id,
-                    message_ids=[test_msg.id],
-                    drop_author=True
-                ),
-                timeout=10.0
-            )
-            count = 1
-            success_count = 1
-            transfer_states[user_id]["current"] = count
-            transfer_states[user_id]["message"] = f"Tezkor ko'chirish: 1/{total_count}"
-            remaining_messages = messages_to_copy[1:]
-        except Exception as test_err:
-            err_str = str(test_err).upper()
-            logger.info(f"Fast batch copy test natijasi: {err_str[:80]}")
-            can_batch_copy = False
-            remaining_messages = messages_to_copy
+        # Manba kanalida himoya (noforwards) bor-yo'qligini tekshirish
+        is_protected = getattr(source_chat, "has_protected_content", False) if source_chat else False
+        can_batch_copy = not is_protected
 
-        # Agar manba kanali ruxsat bersa — 25 tadan paketlab o'tkazish (10x-20x tezroq!)
+        # ─── 🚀 3-USUL: TEZKOR PAKETLAB KO'CHIRISH (Ochiq kanallar uchun) ─────
         if can_batch_copy:
             BATCH_SIZE = 25
-            logger.info(f"🚀 Fast Batch Copy rejimida boshlandi (User {user_id}, {len(remaining_messages)} ta xabar)")
+            logger.info(f"🚀 Fast Batch Copy rejimida boshlandi (User {user_id}, {total_count} ta xabar)")
             
-            for i in range(0, len(remaining_messages), BATCH_SIZE):
+            for i in range(0, total_count, BATCH_SIZE):
                 if cancel_flags.get(user_id):
                     transfer_states[user_id]["status"] = "error"
                     transfer_states[user_id]["message"] = "Ko'chirish to'xtatildi."
                     return
 
-                batch = remaining_messages[i:i + BATCH_SIZE]
-                batch_ids = [m.id for m in batch]
+                batch = messages_to_copy[i:i + BATCH_SIZE]
+                
+                # Takroriy bir xil fayllarni filtrlash
+                filtered_batch = []
+                for m in batch:
+                    _, uid, _, _, _ = get_media_info(m)
+                    if uid and uid in sent_unique_ids:
+                        continue
+                    if uid:
+                        sent_unique_ids.add(uid)
+                    filtered_batch.append(m)
 
+                if not filtered_batch:
+                    count += len(batch)
+                    transfer_states[user_id]["current"] = count
+                    continue
+
+                batch_ids = [m.id for m in filtered_batch]
                 try:
                     await asyncio.wait_for(
                         client.forward_messages(
@@ -148,210 +156,187 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
                         ),
                         timeout=15.0
                     )
+                    success_count += len(filtered_batch)
                     count += len(batch)
-                    success_count += len(batch)
                     transfer_states[user_id]["current"] = count
                     transfer_states[user_id]["message"] = f"Tezkor ko'chirilmoqda ({count}/{total_count})..."
                     await asyncio.sleep(0.3)
-                except FloodWait as fw:
-                    logger.warning(f"FloodWait: {fw.value}s")
-                    transfer_states[user_id]["message"] = f"Telegram cheklovi: {fw.value}s kutilmoqda..."
-                    await asyncio.sleep(min(fw.value, 30))
                 except Exception as batch_err:
-                    logger.warning(f"Batch xatosi: {batch_err}. Paketdagi xabarlar alohida ko'chiriladi...")
-                    for m in batch:
-                        if cancel_flags.get(user_id):
-                            return
-                        try:
-                            await asyncio.wait_for(
-                                client.copy_message(
-                                    chat_id=target_chat_id,
-                                    from_chat_id=source_chat_id,
-                                    message_id=m.id,
-                                    caption=m.caption
-                                ),
-                                timeout=8.0
-                            )
-                            success_count += 1
-                        except Exception:
-                            pass
-                        count += 1
+                    err_str = str(batch_err).upper()
+                    if "RESTRICTED" in err_str:
+                        # Himoyalangan ekan — fallback rejimiga o'tamiz
+                        can_batch_copy = False
+                        messages_to_copy = messages_to_copy[i:]
+                        break
+                    else:
+                        count += len(batch)
                         transfer_states[user_id]["current"] = count
-                        await asyncio.sleep(0.1)
 
-            transfer_states[user_id]["status"] = "completed"
-            transfer_states[user_id]["message"] = f"Muvaffaqiyatli yakunlandi! {success_count} ta media ko'chirildi."
-            logger.info(f"Fast Batch Transfer yakunlandi (User {user_id}): {success_count}/{count}")
-            return
+            if can_batch_copy:
+                transfer_states[user_id]["status"] = "completed"
+                transfer_states[user_id]["message"] = f"Muvaffaqiyatli yakunlandi! {success_count} ta media ko'chirildi."
+                logger.info(f"Fast Batch Transfer yakunlandi (User {user_id}): {success_count}/{count}")
+                return
 
         # ─── 🛡️ ZAXIRA REJIMI: HIMOYALANGAN (NOFORWARDS) KANALLAR UCHUN ───────
         logger.info(f"Yopiq/himoyalangan kanal: yuklab olib yuborish rejimida davom etilmoqda (User {user_id})")
         
-        for message in remaining_messages:
+        for message in messages_to_copy:
             if cancel_flags.get(user_id):
                 transfer_states[user_id]["status"] = "error"
                 transfer_states[user_id]["message"] = "Ko'chirish to'xtatildi."
                 return
 
             msg_num = count + 1
-            transfer_states[user_id]["message"] = f"Ko'chirilmoqda ({msg_num}/{total_count})..."
-            
+            m_type, file_uid, file_size, ext, label = get_media_info(message)
+
+            # Takroriy bir xil rasm yoki video 2 marta yuborilmasin
+            if file_uid and file_uid in sent_unique_ids:
+                logger.info(f"Takroriy fayl o'tkazib yuborildi ({file_uid}) msg_id: {message.id}")
+                count += 1
+                transfer_states[user_id]["current"] = count
+                continue
+
+            if file_uid:
+                sent_unique_ids.add(file_uid)
+
+            transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: {label} ko'chirilmoqda..."
+
+            # 300 MB dan katta fayllarni xavfsizlik uchun o'tkazib yuboramiz
+            if file_size > 300 * 1024 * 1024:
+                logger.warning(f"Fayl juda katta ({file_size / (1024*1024):.1f} MB), o'tkazildi.")
+                transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: Juda katta (>300MB), o'tkazildi"
+                count += 1
+                transfer_states[user_id]["current"] = count
+                continue
+
+            file_path = None
             try:
-                # To'g'ridan-to'g'ri copy_message
-                await asyncio.wait_for(
-                    client.copy_message(
-                        chat_id=target_chat_id,
-                        from_chat_id=source_chat_id,
-                        message_id=message.id,
-                        caption=message.caption
+                def make_progress(action_name):
+                    last_update = [0.0]
+                    async def _prog(cur, tot):
+                        if tot > 0 and not cancel_flags.get(user_id):
+                            import time
+                            now = time.time()
+                            if now - last_update[0] >= 0.5:
+                                last_update[0] = now
+                                cur_mb = cur / (1024 * 1024)
+                                tot_mb = tot / (1024 * 1024)
+                                pct = (cur / tot) * 100
+                                transfer_states[user_id]["message"] = f"{msg_num}/{total_count} {label} {action_name}: {cur_mb:.1f}/{tot_mb:.1f} MB ({pct:.0f}%)"
+                    return _prog
+
+                unique_name = f"transfer_{user_id}_{uuid.uuid4().hex[:6]}{ext}"
+                dest_file = str(config.download_dir / unique_name)
+
+                # 1. Yuklab olish
+                file_path = await asyncio.wait_for(
+                    client.download_media(
+                        message, 
+                        file_name=dest_file,
+                        progress=make_progress("yuklab olinmoqda")
                     ),
-                    timeout=10.0
+                    timeout=90.0
                 )
-                success_count += 1
-            except Exception as copy_err:
-                file_path = None
-                try:
-                    file_size = 0
-                    if message.video and message.video.file_size:
-                        file_size = message.video.file_size
-                    elif message.document and message.document.file_size:
-                        file_size = message.document.file_size
-                    elif message.photo and message.photo.file_size:
-                        file_size = message.photo.file_size
-                    
-                    if file_size > 300 * 1024 * 1024:
-                        logger.warning(f"Fayl juda katta ({file_size / (1024*1024):.1f} MB), o'tkazib yuborildi.")
-                        transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: Fayl juda katta (>300MB), o'tkazib yuborildi"
-                        count += 1
-                        transfer_states[user_id]["current"] = count
-                        continue
 
-                    is_photo = bool(message.photo or message.media == MessageMediaType.PHOTO)
-                    is_video = bool(message.video or message.media == MessageMediaType.VIDEO)
-                    is_audio = bool(message.audio or message.media == MessageMediaType.AUDIO)
+                if file_path and os.path.exists(file_path):
+                    send_timeout = 90.0
 
-                    if is_photo:
-                        ext = ".jpg"
-                        media_label = "Rasm"
-                    elif is_video:
-                        ext = ".mp4"
-                        media_label = "Video"
-                    elif is_audio:
-                        ext = ".mp3"
-                        media_label = "Audio"
-                    elif message.document and message.document.file_name:
-                        ext = os.path.splitext(message.document.file_name)[1] or ".bin"
-                        media_label = "Hujjat"
-                    else:
-                        ext = ".jpg" if is_photo else ".bin"
-                        media_label = "Fayl"
-
-                    def make_progress(action_name):
-                        last_update = [0.0]
-                        async def _prog(cur, tot):
-                            if tot > 0 and not cancel_flags.get(user_id):
-                                import time
-                                now = time.time()
-                                if now - last_update[0] >= 0.5:
-                                    last_update[0] = now
-                                    cur_mb = cur / (1024 * 1024)
-                                    tot_mb = tot / (1024 * 1024)
-                                    pct = (cur / tot) * 100
-                                    transfer_states[user_id]["message"] = f"{msg_num}/{total_count} {media_label} {action_name}: {cur_mb:.1f}/{tot_mb:.1f} MB ({pct:.0f}%)"
-                        return _prog
-
-                    unique_name = f"transfer_{user_id}_{uuid.uuid4().hex[:6]}{ext}"
-                    dest_file = str(config.download_dir / unique_name)
-                    
-                    transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: {media_label} yuklab olinmoqda..."
-                    
-                    file_path = await asyncio.wait_for(
-                        client.download_media(
-                            message, 
-                            file_name=dest_file,
-                            progress=make_progress("yuklab olinmoqda")
-                        ),
-                        timeout=90.0
-                    )
-                    
-                    if file_path and os.path.exists(file_path):
-                        transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: {media_label} kanalga jo'natilmoqda..."
-                        
-                        send_timeout = 90.0
-                        if is_photo:
-                            try:
-                                await asyncio.wait_for(
-                                    client.send_photo(
-                                        target_chat_id, 
-                                        photo=file_path, 
-                                        caption=message.caption, 
-                                        progress=make_progress("yuborilmoqda")
-                                    ),
-                                    timeout=send_timeout
-                                )
-                                success_count += 1
-                            except Exception as photo_err:
-                                logger.warning(f"send_photo xatosi ({photo_err}), send_document orqali yuborilmoqda...")
-                                await asyncio.wait_for(
-                                    client.send_document(
-                                        target_chat_id, 
-                                        document=file_path, 
-                                        caption=message.caption, 
-                                        progress=make_progress("hujjat sifatida yuborilmoqda")
-                                    ),
-                                    timeout=send_timeout
-                                )
-                                success_count += 1
-                        elif is_video:
-                            try:
-                                await asyncio.wait_for(
-                                    client.send_video(
-                                        target_chat_id, 
-                                        video=file_path, 
-                                        caption=message.caption, 
-                                        progress=make_progress("yuborilmoqda")
-                                    ),
-                                    timeout=send_timeout
-                                )
-                                success_count += 1
-                            except Exception as video_err:
-                                logger.warning(f"send_video xatosi ({video_err}), send_document orqali yuborilmoqda...")
-                                await asyncio.wait_for(
-                                    client.send_document(
-                                        target_chat_id, 
-                                        document=file_path, 
-                                        caption=message.caption, 
-                                        progress=make_progress("hujjat sifatida yuborilmoqda")
-                                    ),
-                                    timeout=send_timeout
-                                )
-                                success_count += 1
-                        else:
+                    if m_type == "photo":
+                        try:
                             await asyncio.wait_for(
-                                client.send_document(
+                                client.send_photo(
                                     target_chat_id, 
-                                    document=file_path, 
+                                    photo=file_path, 
                                     caption=message.caption, 
                                     progress=make_progress("yuborilmoqda")
                                 ),
                                 timeout=send_timeout
                             )
                             success_count += 1
-                except asyncio.TimeoutError:
-                    logger.warning(f"Timeout on msg_id {message.id}, skipping...")
-                    transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: Vaqt tugadi (timeout), o'tkazildi"
-                except FloodWait as fw:
-                    logger.warning(f"FloodWait on msg_id {message.id}: {fw.value}s")
-                    transfer_states[user_id]["message"] = f"Telegram cheklovi: {fw.value}s kutilmoqda..."
-                    await asyncio.sleep(min(fw.value, 30))
-                except Exception as inner_e:
-                    logger.error(f"Faylni yuklash/yuborishda xatolik msg_id {message.id}: {inner_e}")
-                finally:
-                    if file_path and os.path.exists(file_path):
+                        except Exception as photo_err:
+                            err_s = str(photo_err).upper()
+                            # Faqat format/o'lcham xatosi bo'lsa hujjat sifatida yuboriladi (ikkita bir xil bo'lmasligi uchun)
+                            if any(k in err_s for k in ["PHOTO_INVALID", "IMAGE_PROCESS", "MEDIA_EMPTY"]):
+                                await asyncio.wait_for(
+                                    client.send_document(
+                                        target_chat_id, 
+                                        document=file_path, 
+                                        caption=message.caption, 
+                                        progress=make_progress("hujjat sifatida yuborilmoqda")
+                                    ),
+                                    timeout=send_timeout
+                                )
+                                success_count += 1
+
+                    elif m_type == "video_note":
+                        # 📹 DUMALOQ VIDEO (VIDEO NOTE)
                         try:
-                            os.remove(file_path)
-                        except Exception:
-                            pass
+                            duration = message.video_note.duration if message.video_note else 0
+                            length = message.video_note.length if message.video_note else 1
+                            await asyncio.wait_for(
+                                client.send_video_note(
+                                    target_chat_id, 
+                                    video_note=file_path, 
+                                    duration=duration,
+                                    length=length,
+                                    progress=make_progress("dumaloq video yuborilmoqda")
+                                ),
+                                timeout=send_timeout
+                            )
+                            success_count += 1
+                        except Exception as vn_err:
+                            logger.warning(f"send_video_note xatosi ({vn_err}), oddiy video sifatida yuborilmoqda...")
+                            await asyncio.wait_for(
+                                client.send_video(
+                                    target_chat_id, 
+                                    video=file_path, 
+                                    caption=message.caption, 
+                                    progress=make_progress("video sifatida yuborilmoqda")
+                                ),
+                                timeout=send_timeout
+                            )
+                            success_count += 1
+
+                    elif m_type == "video":
+                        await asyncio.wait_for(
+                            client.send_video(
+                                target_chat_id, 
+                                video=file_path, 
+                                caption=message.caption, 
+                                progress=make_progress("yuborilmoqda")
+                            ),
+                            timeout=send_timeout
+                        )
+                        success_count += 1
+
+                    else:
+                        await asyncio.wait_for(
+                            client.send_document(
+                                target_chat_id, 
+                                document=file_path, 
+                                caption=message.caption, 
+                                progress=make_progress("yuborilmoqda")
+                            ),
+                            timeout=send_timeout
+                        )
+                        success_count += 1
+
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout on msg_id {message.id}, skipping...")
+                transfer_states[user_id]["message"] = f"{msg_num}/{total_count}: Vaqt tugadi (timeout), o'tkazildi"
+            except FloodWait as fw:
+                logger.warning(f"FloodWait on msg_id {message.id}: {fw.value}s")
+                transfer_states[user_id]["message"] = f"Telegram cheklovi: {fw.value}s kutilmoqda..."
+                await asyncio.sleep(min(fw.value, 30))
+            except Exception as inner_e:
+                logger.error(f"Faylni yuklash/yuborishda xatolik msg_id {message.id}: {inner_e}")
+            finally:
+                if file_path and os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                    except Exception:
+                        pass
 
             count += 1
             transfer_states[user_id]["current"] = count
