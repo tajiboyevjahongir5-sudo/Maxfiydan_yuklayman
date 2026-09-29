@@ -53,10 +53,17 @@ async def on_startup(bot: Bot) -> None:
 
     # Bazani tayyorlash
     logger.info("🗄 Ma'lumotlar bazasi tayyorlanmoqda...")
-    await init_db()
+    try:
+        await init_db()
+        logger.info("✅ Ma'lumotlar bazasi tayyor.")
+    except Exception as e:
+        logger.error(f"⚠️ Bazani tayyorlashda xato (bot davom etadi): {e}", exc_info=True)
 
     # Pyrogram userbot ni ishga tushirish (SessionManager)
-    await userbot.start_all()
+    try:
+        await userbot.start_all()
+    except Exception as e:
+        logger.error(f"⚠️ Userbot sessiyalarini ishga tushirishda xato (bot davom etadi): {e}", exc_info=True)
 
     # Bot ma'lumotlarini olish
     me = await bot.get_me()
