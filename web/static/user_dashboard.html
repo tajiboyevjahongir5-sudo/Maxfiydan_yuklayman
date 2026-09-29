@@ -356,7 +356,7 @@
                     <!-- Progress (Yuklanmoqda) holati -->
                     <div v-else class="text-center py-4">
                         <div class="w-16 h-16 mx-auto border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-                        <h3 class="font-bold text-lg mb-1">{{ transferState.message }}</h3>
+                        <h3 class="font-bold text-base mb-2 text-blue-400 break-words px-2">{{ transferState.message }}</h3>
                         
                         <div v-if="transferState.total > 0">
                             <p class="text-sm text-slate-400 mb-3">Ko'chirildi: <span class="font-mono text-white">{{ transferState.current }}</span> / <span class="font-mono">{{ transferState.total }}</span></p>
@@ -364,11 +364,15 @@
                             <div class="w-full bg-slate-800 rounded-full h-3 mb-2 shadow-inner p-0.5">
                                 <div class="bg-gradient-to-r from-blue-400 to-indigo-500 h-2 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(99,102,241,0.6)]" :style="{width: ((transferState.current / transferState.total) * 100) + '%'}"></div>
                             </div>
-                            <p class="text-xs text-slate-500 text-right">{{ ((transferState.current / transferState.total) * 100).toFixed(1) }}%</p>
+                            <p class="text-xs text-slate-500 text-right mb-4">{{ ((transferState.current / transferState.total) * 100).toFixed(1) }}%</p>
                         </div>
-                        <div v-else class="text-sm text-slate-400">
+                        <div v-else class="text-sm text-slate-400 mb-4">
                             Fayllar sanalmoqda...
                         </div>
+
+                        <button @click="cancelTransfer" type="button" class="text-xs bg-red-500/15 text-red-400 border border-red-500/25 px-4 py-2 rounded-xl hover:bg-red-500/25 transition font-semibold">
+                            ⏹ Jarayonni to'xtatish
+                        </button>
                     </div>
                 </div>
             </div>
@@ -702,6 +706,18 @@ createApp({
             this.transferSource = '';
             this.transferTarget = '';
             if (this.transferPollTimer) clearInterval(this.transferPollTimer);
+        },
+        async cancelTransfer() {
+            try {
+                await fetch('/api/user/transfer/cancel', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                this.resetTransfer();
+                this.tg?.showAlert("Ko'chirish jarayoni to'xtatildi");
+            } catch(e) {
+                this.resetTransfer();
+            }
         },
         async startDownload() {
             if (!this.downloadLink) return;

@@ -378,3 +378,10 @@ async def get_transfer_status(user_id: int = Depends(get_current_user_id)):
     if not state:
         return {"status": "none"}
     return state
+
+@router.post('/transfer/cancel')
+async def cancel_transfer(user_id: int = Depends(get_current_user_id)):
+    """Ko'chirish jarayonini bekor qilish."""
+    from web.api.transfer_task import cancel_transfer_task
+    cancel_transfer_task(user_id)
+    return {"status": "ok", "message": "Ko'chirish to'xtatildi"}
