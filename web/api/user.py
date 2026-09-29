@@ -266,7 +266,7 @@ class ChannelInfo(BaseModel):
 
 @router.get('/channels', response_model=List[ChannelInfo])
 async def get_my_channels(user_id: int = Depends(get_current_user_id)):
-    "\""Userga tegishli (ulangan) kanal va guruhlar ro'yxatini qaytaradi."\""
+    """Userga tegishli (ulangan) kanal va guruhlar ro'yxatini qaytaradi."""
     from userbot import userbot
     from pyrogram.enums import ChatType
     
@@ -290,7 +290,7 @@ class TransferRequest(BaseModel):
 
 @router.post('/transfer')
 async def start_transfer(req: TransferRequest, user_id: int = Depends(get_current_user_id)):
-    "\""Ko'chirish (transfer) jarayonini orqa fonda boshlaydi."\""
+    """Ko'chirish (transfer) jarayonini orqa fonda boshlaydi."""
     from userbot import userbot
     from web.api.transfer_task import run_transfer
     import asyncio
@@ -304,6 +304,6 @@ async def start_transfer(req: TransferRequest, user_id: int = Depends(get_curren
             req.target_chat_id, 
             req.media_type
         ))
-        return {'status': 'ok', 'message': ""Ko'chirish boshlandi. Bu jarayon fonda davom etadi!""}
+        return {'status': 'ok', 'message': "Ko'chirish boshlandi. Bu jarayon fonda davom etadi!"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
