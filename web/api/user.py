@@ -271,10 +271,10 @@ async def get_my_channels(user_id: int = Depends(get_current_user_id)):
     from pyrogram.enums import ChatType
     
     try:
-        client = userbot.get_client(user_id)
+        client = await userbot.get_client(user_id)
         channels = []
         async for dialog in client.get_dialogs():
-            if dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
+            if dialog.chat and dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
                 channels.append(ChannelInfo(
                     id=dialog.chat.id, 
                     title=dialog.chat.title or 'Nomsiz Kanal'
@@ -296,7 +296,7 @@ async def start_transfer(req: TransferRequest, user_id: int = Depends(get_curren
     import asyncio
     
     try:
-        client = userbot.get_client(user_id)
+        client = await userbot.get_client(user_id)
         # Orqa fonda (background) ko'chirishni boshlash
         asyncio.create_task(run_transfer(
             user_id,

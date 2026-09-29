@@ -232,14 +232,30 @@ class SessionManager:
                     logger.info(f"🛑 Userbot (ID: {user_id}) to'xtatildi.")
             self.clients.clear()
 
-    def get_client(self, user_id: int) -> Client:
-        """Berilgan user_id uchun Client qaytaradi."""
-        if user_id not in self.clients or not self.clients[user_id].is_connected:
-            raise UserbotError(
-                "Sizning Telegram profilingiz (sessiyangiz) tizimga ulanmagan. "
-                "Iltimos, avval /admin komandasi orqali Web Dashboard'ga kiring va profilingizni ulang."
+    async def get_client(self, user_id: int) -> Client:
+        """Berilgan user_id uchun Client qaytaradi. Agar xotirada bo'lmasa, bazadan yuklab ishga tushiradi."""
+        if user_id in self.clients and self.clients[user_id].is_connected:
+            return self.clients[user_id]
+            
+        # Bazadan faol sessiyani topish va avtomatik ulash
+        async with async_session() as db:
+            result = await db.execute(
+                select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True)
             )
-        return self.clients[user_id]
+            session = result.scalar_one_or_none()
+            if session and session.session_string:
+                try:
+                    logger.info(f"🔄 User ID {user_id} sessiyasi xotirada yo'q edi, bazadan ishga tushirilmoqda...")
+                    await self.start_session(user_id, session.session_string)
+                    if user_id in self.clients and self.clients[user_id].is_connected:
+                        return self.clients[user_id]
+                except Exception as e:
+                    logger.error(f"Avtomatik sessiya ulanishda xato (User ID: {user_id}): {e}")
+
+        raise UserbotError(
+            "Sizning Telegram profilingiz (sessiyangiz) tizimga ulanmagan. "
+            "Iltimos, avval Sozlamalar bo'limidan akkauntingizni qaytadan ulang."
+        )
 
     async def fetch_and_download(self, user_id: int, parsed_link: ParsedLink, progress_callback=None):
         """
@@ -247,7 +263,7 @@ class SessionManager:
         List of (path, media_type) tuples qaytaradi (Albomlar uchun).
         """
         try:
-            client = self.get_client(user_id)
+            client = await self.get_client(user_id)
             messages = await self._get_messages(client, parsed_link, user_id)
             
             results = []

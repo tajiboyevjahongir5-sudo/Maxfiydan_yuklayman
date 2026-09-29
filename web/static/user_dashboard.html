@@ -595,7 +595,12 @@ createApp({
                 if (res.ok) {
                     this.channels = await res.json();
                 } else {
-                    this.tg?.showAlert("Kanallarni yuklashda xato!");
+                    let errMsg = "Kanallarni yuklashda xato!";
+                    try {
+                        const d = await res.json();
+                        if (d.detail) errMsg = d.detail;
+                    } catch(x) {}
+                    this.tg?.showAlert(errMsg);
                 }
             } catch (e) {
                 console.error(e);
