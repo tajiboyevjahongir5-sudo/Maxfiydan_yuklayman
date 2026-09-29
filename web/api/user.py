@@ -260,3 +260,50 @@ async def request_download(req: DownloadRequest, user_id: int = Depends(get_curr
 
     asyncio.create_task(_do_download(user_id, user.first_name, req.link))
     return {"status": "success"}
+class ChannelInfo(BaseModel):
+    id: int
+    title: str
+
+@router.get('/channels', response_model=List[ChannelInfo])
+async def get_my_channels(user_id: int = Depends(get_current_user_id)):
+    "\""Userga tegishli (ulangan) kanal va guruhlar ro'yxatini qaytaradi."\""
+    from userbot import userbot
+    from pyrogram.enums import ChatType
+    
+    try:
+        client = userbot.get_client(user_id)
+        channels = []
+        async for dialog in client.get_dialogs():
+            if dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
+                channels.append(ChannelInfo(
+                    id=dialog.chat.id, 
+                    title=dialog.chat.title or 'Nomsiz Kanal'
+                ))
+        return channels
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+class TransferRequest(BaseModel):
+    source_chat_id: int
+    target_chat_id: int
+    media_type: str
+
+@router.post('/transfer')
+async def start_transfer(req: TransferRequest, user_id: int = Depends(get_current_user_id)):
+    "\""Ko'chirish (transfer) jarayonini orqa fonda boshlaydi."\""
+    from userbot import userbot
+    from web.api.transfer_task import run_transfer
+    import asyncio
+    
+    try:
+        client = userbot.get_client(user_id)
+        # Orqa fonda (background) ko'chirishni boshlash
+        asyncio.create_task(run_transfer(
+            client, 
+            req.source_chat_id, 
+            req.target_chat_id, 
+            req.media_type
+        ))
+        return {'status': 'ok', 'message': ""Ko'chirish boshlandi. Bu jarayon fonda davom etadi!""}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

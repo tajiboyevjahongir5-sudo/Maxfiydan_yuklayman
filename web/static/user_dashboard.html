@@ -269,6 +269,51 @@
                 </div>
             </div>
 
+            <!-- ── KO'CHIRISH ── -->
+            <div v-else-if="tab === 'transfer'" key="transfer" class="space-y-4">
+                <div class="glass p-5 rounded-2xl">
+                    <h2 class="text-xl font-bold mb-1">Kanaldan ko'chirish</h2>
+                    <p class="text-sm text-slate-400 mb-5">Bir kanaldagi barcha materiallarni boshqasiga o'tkazish.</p>
+
+                    <div v-if="!sessionActive" class="text-sm text-red-400 mb-4">
+                        Kanallarni ko'rish uchun avval ulanish bo'limidan akkauntingizni ulang!
+                    </div>
+
+                    <div v-else>
+                        <div class="mb-4">
+                            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanaldan:</label>
+                            <select v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                <option value="" disabled>Kanalni tanlang...</option>
+                                <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
+                            <select v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                <option value="" disabled>Kanalni tanlang...</option>
+                                <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-5">
+                            <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Nimani ko'chiramiz:</label>
+                            <select v-model="transferType" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                <option value="all">Barchasi (Rasm + Video)</option>
+                                <option value="photo">Faqat Rasmlar</option>
+                                <option value="video">Faqat Videolar</option>
+                            </select>
+                        </div>
+
+                        <button @click="startTransfer" :disabled="!transferSource || !transferTarget || transferSource === transferTarget || isTransferring" class="btn-primary w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                            <span v-if="isTransferring">⏳ Ko'chirilmoqda...</span>
+                            <span v-else>🚀 Ko'chirishni boshlash</span>
+                        </button>
+                        <p v-if="transferMessage" class="mt-3 text-center text-sm text-green-400">{{ transferMessage }}</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- ── SOZLAMALAR ── -->
             <div v-else-if="tab === 'sozlama'" key="sozlama" class="space-y-4">
                 <h2 class="text-xl font-bold">Sozlamalar</h2>
@@ -321,6 +366,12 @@
             </svg>
             <span class="text-[10px] font-medium">Tarif</span>
         </button>
+        <button @click="tab='transfer'" :class="tab==='transfer'?'text-blue-400':'text-slate-500'" class="flex flex-col items-center gap-1 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <span class="text-[10px] font-medium">Ko'chirish</span>
+        </button>
         <button @click="tab='sozlama'" :class="tab==='sozlama'?'text-blue-400':'text-slate-500'" class="flex flex-col items-center gap-1 transition">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -364,6 +415,14 @@ createApp({
             sessionActive: false,
             authStep: 'phone',
             phone: '', code: '', phoneHash: '', pass2fa: '',
+            
+            // Transfer
+            channels: [],
+            transferSource: '',
+            transferTarget: '',
+            transferType: 'all',
+            isTransferring: false,
+            transferMessage: '',
             loading: false,
 
             // Tariffs
@@ -434,7 +493,56 @@ createApp({
         }
         await this.loadTariffs();
     },
+    watch: {
+        tab(newVal) {
+            if (newVal === 'transfer' && this.sessionActive && this.channels.length === 0) {
+                this.loadChannels();
+            }
+        }
+    },
     methods: {
+        async loadChannels() {
+            try {
+                const res = await fetch('/api/user/channels', {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                if (res.ok) {
+                    this.channels = await res.json();
+                } else {
+                    this.tg?.showAlert("Kanallarni yuklashda xato!");
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        },
+        async startTransfer() {
+            if (!this.transferSource || !this.transferTarget) return;
+            this.isTransferring = true;
+            this.transferMessage = "";
+            try {
+                const res = await fetch('/api/user/transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({
+                        source_chat_id: parseInt(this.transferSource),
+                        target_chat_id: parseInt(this.transferTarget),
+                        media_type: this.transferType
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.transferMessage = data.message;
+                    this.tg?.showAlert("Ko'chirish boshlandi!");
+                } else {
+                    this.transferMessage = "Xato: " + data.detail;
+                    this.tg?.showAlert("Xato yuz berdi: " + data.detail);
+                }
+            } catch (e) {
+                this.transferMessage = "Ulanishda xato!";
+            } finally {
+                this.isTransferring = false;
+            }
+        },
         async startDownload() {
             if (!this.downloadLink) return;
             if (!this.token) {
