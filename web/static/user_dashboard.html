@@ -314,17 +314,20 @@
 
                         <div v-if="!transferState || transferState.status === 'none'">
                             <div class="mb-4">
-                                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanaldan:</label>
-                                <select v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>Kanalni tanlang...</option>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-xs text-slate-400 uppercase tracking-wider">Qaysi kanaldan:</label>
+                                    <button @click="loadChannels" type="button" class="text-xs text-blue-400 hover:text-blue-300">🔄 Yangilash</button>
+                                </div>
+                                <select v-model="transferSource" @focus="channels.length === 0 && loadChannels()" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="" disabled>{{ loadingChannels ? 'Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang...' : 'Kanallar yuklanmadi (bosing)') }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
                             </div>
 
                             <div class="mb-4">
                                 <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
-                                <select v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>Kanalni tanlang...</option>
+                                <select v-model="transferTarget" @focus="channels.length === 0 && loadChannels()" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="" disabled>{{ loadingChannels ? 'Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang...' : 'Kanallar yuklanmadi (bosing)') }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
                             </div>
@@ -508,6 +511,7 @@ createApp({
             
             // Transfer
             channels: [],
+            loadingChannels: false,
             transferSource: '',
             transferTarget: '',
             transferType: 'all',
@@ -584,18 +588,23 @@ createApp({
             await this.loadProfile();
             // Sessiya faolligini tekshirish
             await this.checkSession();
+            if (this.tab === 'transfer' && this.channels.length === 0) {
+                this.loadChannels();
+            }
         }
         await this.loadTariffs();
     },
     watch: {
         tab(newVal) {
-            if (newVal === 'transfer' && this.sessionActive && this.channels.length === 0) {
+            if (newVal === 'transfer' && this.channels.length === 0) {
                 this.loadChannels();
             }
         }
     },
     methods: {
         async loadChannels() {
+            if (this.loadingChannels) return;
+            this.loadingChannels = true;
             try {
                 const res = await fetch('/api/user/channels', {
                     headers: { 'Authorization': `Bearer ${this.token}` }
@@ -612,6 +621,8 @@ createApp({
                 }
             } catch (e) {
                 console.error(e);
+            } finally {
+                this.loadingChannels = false;
             }
         },
         async startTransfer() {
@@ -749,6 +760,9 @@ createApp({
                 if (res.ok) {
                     const d = await res.json();
                     this.sessionActive = d.is_active === true;
+                    if (this.sessionActive && this.tab === 'transfer' && this.channels.length === 0) {
+                        this.loadChannels();
+                    }
                 }
             } catch {}
         },
