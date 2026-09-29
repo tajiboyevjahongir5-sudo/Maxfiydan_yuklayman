@@ -53,36 +53,20 @@ async def on_startup(bot: Bot) -> None:
 
     # Bazani tayyorlash
     logger.info("🗄 Ma'lumotlar bazasi tayyorlanmoqda...")
-    try:
-        await asyncio.wait_for(init_db(), timeout=10.0)
-        logger.info("✅ Ma'lumotlar bazasi tayyor.")
-    except Exception as e:
-        logger.error(f"⚠️ Bazani tayyorlashda xato (bot davom etadi): {e}", exc_info=True)
+    await init_db()
 
-    # Pyrogram userbot sessiyalarini fonda (background task) ishga tushirish
-    # Bu orqali bot polling hech qachon to'xtab (qotib) qolmaydi!
-    async def _safe_start_userbots():
-        try:
-            logger.info("🤖 Userbot sessiyalarini ishga tushirish boshlandi...")
-            await userbot.start_all()
-            logger.info(f"✅ Userbot sessiyalari tayyor (Faol: {len(userbot.clients)} ta).")
-        except Exception as e:
-            logger.error(f"⚠️ Userbot sessiyalarini ishga tushirishda xato: {e}", exc_info=True)
-
-    asyncio.create_task(_safe_start_userbots())
+    # Pyrogram userbot ni ishga tushirish (SessionManager)
+    await userbot.start_all()
 
     # Bot ma'lumotlarini olish
-    try:
-        me = await asyncio.wait_for(bot.get_me(), timeout=10.0)
-        logger.info(f"🤖 Aiogram Bot: @{me.username} (ID: {me.id})")
-        logger.info(f"📂 Yuklamalar papkasi: {config.download_dir.resolve()}")
+    me = await bot.get_me()
+    logger.info(f"🤖 Aiogram Bot: @{me.username} (ID: {me.id})")
+    logger.info(f"📂 Yuklamalar papkasi: {config.download_dir.resolve()}")
 
-        if config.allowed_users:
-            logger.info(f"🔐 Ruxsatli foydalanuvchilar: {config.allowed_users}")
-        else:
-            logger.info("🌐 Kirish cheklovlari: Hamma foydalanuvchilar ruxsatli")
-    except Exception as e:
-        logger.error(f"⚠️ Bot ma'lumotlarini olishda xato: {e}", exc_info=True)
+    if config.allowed_users:
+        logger.info(f"🔐 Ruxsatli foydalanuvchilar: {config.allowed_users}")
+    else:
+        logger.info("🌐 Kirish cheklovlari: Hamma foydalanuvchilar ruxsatli")
 
     logger.info("✅ Bot tayyor! Polling boshlandi...")
     logger.info("=" * 60)
