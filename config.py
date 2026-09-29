@@ -35,7 +35,7 @@ class UserbotConfig:
     """Pyrogram userbot konfiguratsiyasi."""
     api_id: int
     api_hash: str
-    session_string: str
+    session_string: str = ""
 
     def __post_init__(self):
         if self.api_id == 0:
@@ -47,11 +47,6 @@ class UserbotConfig:
             raise ValueError(
                 "❌ API_HASH bo'sh. "
                 "https://my.telegram.org/apps dan oling."
-            )
-        if not self.session_string:
-            raise ValueError(
-                "❌ PYROGRAM_SESSION_STRING bo'sh. "
-                "'python generate_session.py' ni ishga tushiring."
             )
 
 
