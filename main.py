@@ -55,8 +55,8 @@ async def on_startup(bot: Bot) -> None:
     logger.info("🗄 Ma'lumotlar bazasi tayyorlanmoqda...")
     await init_db()
 
-    # Pyrogram userbot ni ishga tushirish (SessionManager)
-    await userbot.start_all()
+    # Pyrogram userbot ni fonda (background) ishga tushirish — bot polling'ni to'xtatib qo'ymasligi uchun!
+    asyncio.create_task(userbot.start_all())
 
     # Bot ma'lumotlarini olish
     me = await bot.get_me()
