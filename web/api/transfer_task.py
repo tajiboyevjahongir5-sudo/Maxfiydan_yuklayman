@@ -6,10 +6,12 @@ import os
 import shutil
 import uuid
 import aiofiles
+from typing import Union, Optional
 from pyrogram import Client
 from pyrogram.enums import MessageMediaType, MessagesFilter
 from pyrogram.errors import FloodWait
 from config import config
+from utils import parse_target_chat
 
 logger = logging.getLogger(__name__)
 
@@ -126,11 +128,13 @@ async def fast_download_media(
                 pass
         return await client.download_media(message, file_name=dest_file, progress=progress_callback)
 
-async def run_transfer(user_id: int, client: Client, source_chat_id: int, target_chat_id: int, media_type: str):
+async def run_transfer(user_id: int, client: Client, source_chat_id: Union[int, str], target_chat_id: Union[int, str], media_type: str):
+    source_chat_id = parse_target_chat(source_chat_id)
+    target_chat_id = parse_target_chat(target_chat_id)
     logger.info(f"Ko'chirish boshlandi (User {user_id}): {source_chat_id} -> {target_chat_id} ({media_type})")
     
     cancel_flags[user_id] = False
-    transfer_states[user_id] = {"total": 0, "current": 0, "status": "initializing", "message": "Kanal ma'lumotlari tekshirilmoqda..."}
+    transfer_states[user_id] = {"total": 0, "current": 0, "status": "initializing", "message": "Kanal/guruh ma'lumotlari tekshirilmoqda..."}
     
     try:
         config.download_dir.mkdir(parents=True, exist_ok=True)
@@ -140,20 +144,36 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
         target_chat = None
         try:
             source_chat = await asyncio.wait_for(client.get_chat(source_chat_id), timeout=8.0)
-            target_chat = await asyncio.wait_for(client.get_chat(target_chat_id), timeout=8.0)
         except Exception as e:
-            logger.info(f"Peer topilmadi, dialoglar yuklanmoqda (User {user_id}): {e}")
+            logger.info(f"Source peer get_chat xatosi ({e}), dialoglar tekshirilmoqda...")
             try:
-                async for dialog in client.get_dialogs(limit=50):
+                async for dialog in client.get_dialogs(limit=300):
                     if cancel_flags.get(user_id):
                         return
-                    if dialog.chat:
-                        if dialog.chat.id == source_chat_id:
-                            source_chat = dialog.chat
-                        elif dialog.chat.id == target_chat_id:
-                            target_chat = dialog.chat
+                    if dialog.chat and (dialog.chat.id == source_chat_id or getattr(dialog.chat, "username", None) == source_chat_id):
+                        source_chat = dialog.chat
+                        break
             except Exception:
                 pass
+
+        try:
+            target_chat = await asyncio.wait_for(client.get_chat(target_chat_id), timeout=8.0)
+        except Exception as e:
+            logger.info(f"Target peer get_chat xatosi ({e}), dialoglar tekshirilmoqda...")
+            try:
+                async for dialog in client.get_dialogs(limit=300):
+                    if cancel_flags.get(user_id):
+                        return
+                    if dialog.chat and (dialog.chat.id == target_chat_id or getattr(dialog.chat, "username", None) == target_chat_id):
+                        target_chat = dialog.chat
+                        break
+            except Exception:
+                pass
+
+        if source_chat:
+            source_chat_id = source_chat.id
+        if target_chat:
+            target_chat_id = target_chat.id
 
         if cancel_flags.get(user_id):
             return
@@ -169,7 +189,7 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
             # Rasm, video + Dumaloq video (VIDEO_NOTE)
             filters = [MessagesFilter.PHOTO_VIDEO, MessagesFilter.VIDEO_NOTE]
             
-        transfer_states[user_id]["message"] = "Medialar sanalmoqda..."
+        transfer_states[user_id]["message"] = "Medialar aniqlanmoqda..."
         
         # Barcha xabarlarni yig'ish (id bo'yicha takrorlanishsiz)
         messages_dict = {}
@@ -186,6 +206,31 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: int, target
                         transfer_states[user_id]["message"] = f"Xabarlar aniqlanmoqda ({len(messages_dict)} ta)..."
             except Exception as e:
                 logger.warning(f"search_messages xatosi ({f}): {e}")
+
+        # Agar search_messages da xabar topilmasa (masalan qidiruv cheklangan maxfiy guruhlarda),
+        # get_chat_history orqali to'g'ridan-to'g'ri xabarlar tarixidan o'qiladi
+        if not messages_dict:
+            logger.info("search_messages da hech narsa topilmadi, get_chat_history orqali to'g'ridan-to'g'ri o'qilmoqda...")
+            transfer_states[user_id]["message"] = "Guruh xabarlari to'g'ridan-to'g'ri tekshirilmoqda..."
+            try:
+                async for message in client.get_chat_history(chat_id=source_chat_id, limit=300):
+                    if cancel_flags.get(user_id):
+                        return
+                    if not message:
+                        continue
+                    m_type, file_uid, _, _, _ = get_media_info(message)
+                    if not m_type:
+                        continue
+                    if media_type == "photo" and m_type == "photo":
+                        messages_dict[message.id] = message
+                    elif media_type == "video" and m_type in ["video", "video_note"]:
+                        messages_dict[message.id] = message
+                    elif media_type == "all":
+                        messages_dict[message.id] = message
+                    if len(messages_dict) % 30 == 0:
+                        transfer_states[user_id]["message"] = f"Guruhdan medialar aniqlanmoqda ({len(messages_dict)} ta)..."
+            except Exception as hist_err:
+                logger.warning(f"get_chat_history xatosi: {hist_err}")
 
         if not messages_dict:
             transfer_states[user_id]["status"] = "completed"

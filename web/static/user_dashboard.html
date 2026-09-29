@@ -319,23 +319,41 @@
                         <div v-if="!transferState || transferState.status === 'none'">
                             <div class="mb-4">
                                 <div class="flex items-center justify-between mb-2">
-                                    <label class="block text-xs text-slate-400 uppercase tracking-wider">Qaysi kanaldan:</label>
-                                    <button @click="loadChannels(true)" type="button" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
-                                        <span :class="{'animate-spin inline-block': loadingChannels}">🔄</span> Yangilash
-                                    </button>
+                                    <label class="block text-xs text-slate-400 uppercase tracking-wider">Qaysi kanal yoki guruhdan:</label>
+                                    <div class="flex items-center gap-2">
+                                        <button @click="sourceManual = !sourceManual" type="button" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium">
+                                            {{ sourceManual ? '📋 Ro\'yxat' : '✏️ Havola/ID' }}
+                                        </button>
+                                        <button @click="loadChannels(true)" type="button" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                                            <span :class="{'animate-spin inline-block': loadingChannels}">🔄</span> Yangilash
+                                        </button>
+                                    </div>
                                 </div>
-                                <select v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>{{ loadingChannels ? '⏳ Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang (' + channels.length + ' ta)...' : (!sessionActive ? '⚠️ Avval akkauntni ulang' : 'Kanal topilmadi (🔄 Yangilashni bosing)')) }}</option>
+                                <select v-if="!sourceManual" v-model="transferSource" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="" disabled>{{ loadingChannels ? '⏳ Kanal va guruhlar yuklanmoqda...' : (channels.length ? 'Kanal yoki guruhni tanlang (' + channels.length + ' ta)...' : (!sessionActive ? '⚠️ Avval akkauntni ulang' : 'Topilmadi (🔄 Yangilashni bosing)')) }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
+                                <div v-else>
+                                    <input v-model="transferSource" type="text" placeholder="https://t.me/c/1234567890/1 yoki -100... yoki @guruh" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-cyan-500 outline-none text-white text-sm">
+                                    <p class="text-[11px] text-slate-400 mt-1">💡 Maxfiy guruh havolasi, post havolasi (t.me/c/...) yoki ID sini kiriting</p>
+                                </div>
                             </div>
 
                             <div class="mb-4">
-                                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
-                                <select v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>{{ loadingChannels ? '⏳ Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang (' + channels.length + ' ta)...' : (!sessionActive ? '⚠️ Avval akkauntni ulang' : 'Kanal topilmadi (🔄 Yangilashni bosing)')) }}</option>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-xs text-slate-400 uppercase tracking-wider">Qaysi kanal yoki guruhga:</label>
+                                    <button @click="targetManual = !targetManual" type="button" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium">
+                                        {{ targetManual ? '📋 Ro\'yxat' : '✏️ Havola/ID' }}
+                                    </button>
+                                </div>
+                                <select v-if="!targetManual" v-model="transferTarget" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
+                                    <option value="" disabled>{{ loadingChannels ? '⏳ Kanal va guruhlar yuklanmoqda...' : (channels.length ? 'Kanal yoki guruhni tanlang (' + channels.length + ' ta)...' : (!sessionActive ? '⚠️ Avval akkauntni ulang' : 'Topilmadi (🔄 Yangilashni bosing)')) }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
+                                <div v-else>
+                                    <input v-model="transferTarget" type="text" placeholder="https://t.me/c/... yoki -100... yoki @kanal" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-cyan-500 outline-none text-white text-sm">
+                                    <p class="text-[11px] text-slate-400 mt-1">💡 Qabul qiluvchi kanal/guruh havolasi yoki ID sini kiriting</p>
+                                </div>
                             </div>
 
                             <div class="mb-5">
@@ -527,6 +545,8 @@ createApp({
             loadingChannels: false,
             transferSource: '',
             transferTarget: '',
+            sourceManual: false,
+            targetManual: false,
             transferType: 'all',
             isTransferring: false,
             transferMessage: '',
@@ -618,7 +638,8 @@ createApp({
             if (this.loadingChannels) return;
             this.loadingChannels = true;
             try {
-                const res = await fetch('/api/user/channels', {
+                const url = showAlertOnError ? '/api/user/channels?refresh=true' : '/api/user/channels';
+                const res = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${this.token}` }
                 });
                 if (res.ok) {
@@ -632,7 +653,7 @@ createApp({
                         localStorage.removeItem('cached_channels');
                     }
                     if (showAlertOnError) {
-                        let msg = "Kanallarni yuklashda xato!";
+                        let msg = "Kanal va guruhlarni yuklashda xato!";
                         try {
                             const d = await res.json();
                             if (d.detail) msg = d.detail;
@@ -653,15 +674,17 @@ createApp({
             if (!this.transferSource || !this.transferTarget) return;
             this.isTransferring = true;
             this.transferState = { status: 'initializing', message: 'Tayyorlanmoqda...', current: 0, total: 0 };
-            const sourceId = Number(this.transferSource);
-            const targetId = Number(this.transferTarget);
+            const sStr = String(this.transferSource).trim();
+            const tStr = String(this.transferTarget).trim();
+            const sourceVal = (!isNaN(sStr) && sStr !== '') ? Number(sStr) : sStr;
+            const targetVal = (!isNaN(tStr) && tStr !== '') ? Number(tStr) : tStr;
             try {
                 const res = await fetch('/api/user/transfer', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
                     body: JSON.stringify({
-                        source_chat_id: sourceId,
-                        target_chat_id: targetId,
+                        source_chat_id: sourceVal,
+                        target_chat_id: targetVal,
                         media_type: this.transferType
                     })
                 });

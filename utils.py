@@ -6,6 +6,7 @@
 
 import re
 import logging
+from typing import Union, Optional
 from dataclasses import dataclass
 from enum import Enum, auto
 
@@ -84,6 +85,36 @@ def parse_telegram_link(url: str) -> ParsedLink | None:
         )
 
     return None
+
+
+def parse_target_chat(val: Union[int, str]) -> Union[int, str]:
+    """Kanal yoki guruh identifikatorini (link, username, int) to'g'ri Pyrogram formatiga o'tkazadi."""
+    if isinstance(val, int):
+        return val
+    s = str(val).strip()
+    if not s:
+        return s
+    # 1. Yopiq kanal/guruh havolasi: t.me/c/1234567890/123 yoki t.me/c/1234567890
+    m = re.search(r"t\.me/c/(\d+)", s)
+    if m:
+        return int(f"-100{m.group(1)}")
+    # 2. Ochiq kanal/guruh havolasi: t.me/username
+    m_pub = re.search(r"t\.me/([a-zA-Z0-9_]{3,})", s)
+    if m_pub:
+        uname = m_pub.group(1)
+        if uname.lower() not in {"joinchat", "addstickers", "c"}:
+            return uname
+    # 3. @username
+    if s.startswith("@"):
+        return s.lstrip("@")
+    # 4. Raqamli ID: -100... yoki 123456789
+    try:
+        num = int(s)
+        if num > 0 and len(s) >= 9:
+            return int(f"-100{num}")
+        return num
+    except ValueError:
+        return s
 
 
 # ─── Media turi ─────────────────────────────────────────────────────────────

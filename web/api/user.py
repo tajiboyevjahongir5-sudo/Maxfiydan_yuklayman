@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime
 from database import async_session, User, DownloadHistory, UserTariff, Tariff
 from sqlalchemy import select
@@ -263,19 +263,21 @@ async def request_download(req: DownloadRequest, user_id: int = Depends(get_curr
 class ChannelInfo(BaseModel):
     id: int
     title: str
+    type: str = "channel"
 
 _channels_cache: dict = {}
 
 @router.get('/channels', response_model=List[ChannelInfo])
-async def get_my_channels(user_id: int = Depends(get_current_user_id)):
+async def get_my_channels(refresh: bool = False, user_id: int = Depends(get_current_user_id)):
     """Userga tegishli (ulangan) kanal va guruhlar ro'yxatini qaytaradi."""
     import time
     import asyncio
     from userbot import userbot
     from pyrogram.enums import ChatType
+    from pyrogram import raw
 
-    # Tezkor kesh (agar 5 daqiqa ichida olingan bo'lsa, bir zumda 0.01 soniyada qaytariladi)
-    if user_id in _channels_cache:
+    # Tezkor kesh (agar refresh=False bo'lsa va 5 daqiqa ichida olingan bo'lsa)
+    if not refresh and user_id in _channels_cache:
         cached_time, cached_channels = _channels_cache[user_id]
         if time.time() - cached_time < 300 and cached_channels:
             return cached_channels
@@ -306,16 +308,76 @@ async def get_my_channels(user_id: int = Depends(get_current_user_id)):
         
         async def _fetch_dialogs():
             ch_list = []
-            async for dialog in client.get_dialogs(limit=50):
-                if dialog.chat and dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
-                    ch_list.append(ChannelInfo(
-                        id=dialog.chat.id, 
-                        title=dialog.chat.title or 'Nomsiz Kanal'
-                    ))
+            seen_ids = set()
+            valid_types = {
+                ChatType.CHANNEL,
+                ChatType.GROUP,
+                ChatType.SUPERGROUP,
+                ChatType.FORUM,
+                getattr(ChatType, "MONOFORUM", None)
+            }
+
+            # 1. Asosiy jilddagi dialoglar (300 tagacha guruh va kanal)
+            try:
+                async for dialog in client.get_dialogs(limit=300):
+                    if dialog.chat and dialog.chat.type in valid_types and dialog.chat.id not in seen_ids:
+                        seen_ids.add(dialog.chat.id)
+                        c_type = dialog.chat.type
+                        if c_type == ChatType.CHANNEL:
+                            prefix = "📢 "
+                            t_label = "channel"
+                        elif c_type in [ChatType.FORUM, getattr(ChatType, "MONOFORUM", None)]:
+                            prefix = "💬 [Forum] "
+                            t_label = "group"
+                        else:
+                            prefix = "👥 [Guruh] "
+                            t_label = "group"
+                        
+                        raw_title = dialog.chat.title or ("Kanal" if c_type == ChatType.CHANNEL else "Guruh")
+                        ch_list.append(ChannelInfo(
+                            id=dialog.chat.id, 
+                            title=f"{prefix}{raw_title}",
+                            type=t_label
+                        ))
+            except Exception as d_err:
+                logger.warning(f"get_dialogs asosiy jild xatosi: {d_err}")
+
+            # 2. Arxiv jildidagi dialoglar (folder_id=1)
+            try:
+                r_arch = await client.invoke(
+                    raw.functions.messages.GetDialogs(
+                        offset_date=0,
+                        offset_id=0,
+                        offset_peer=raw.types.InputPeerEmpty(),
+                        limit=100,
+                        hash=0,
+                        folder_id=1
+                    )
+                )
+                if r_arch and hasattr(r_arch, "chats"):
+                    for c in r_arch.chats:
+                        cid = getattr(c, "id", None)
+                        if not cid:
+                            continue
+                        full_id = -int(f"100{cid}") if isinstance(c, raw.types.Channel) else -int(cid)
+                        if full_id not in seen_ids:
+                            seen_ids.add(full_id)
+                            c_title = getattr(c, "title", "Nomsiz")
+                            is_megagroup = getattr(c, "megagroup", False)
+                            is_channel = isinstance(c, raw.types.Channel) and not is_megagroup
+                            prefix = "📢 [Arxiv] " if is_channel else "👥 [Arxiv Guruh] "
+                            ch_list.append(ChannelInfo(
+                                id=full_id,
+                                title=f"{prefix}{c_title}",
+                                type="channel" if is_channel else "group"
+                            ))
+            except Exception as arch_e:
+                logger.debug(f"Arxiv dialoglarini olishda ogohlantirish: {arch_e}")
+
             return ch_list
 
         try:
-            channels = await asyncio.wait_for(_fetch_dialogs(), timeout=8.0)
+            channels = await asyncio.wait_for(_fetch_dialogs(), timeout=15.0)
         except asyncio.TimeoutError:
             logger.warning(f"get_dialogs timeout for user {user_id}")
             if user_id in _channels_cache and _channels_cache[user_id][1]:
@@ -334,8 +396,8 @@ async def get_my_channels(user_id: int = Depends(get_current_user_id)):
         raise HTTPException(status_code=400, detail=str(e))
 
 class TransferRequest(BaseModel):
-    source_chat_id: int
-    target_chat_id: int
+    source_chat_id: Union[int, str]
+    target_chat_id: Union[int, str]
     media_type: str
 
 @router.post('/transfer')
@@ -343,6 +405,7 @@ async def start_transfer(req: TransferRequest, user_id: int = Depends(get_curren
     """Ko'chirish (transfer) jarayonini orqa fonda boshlaydi."""
     from userbot import userbot
     from web.api.transfer_task import run_transfer
+    from utils import parse_target_chat
     import asyncio
     
     try:
@@ -358,12 +421,16 @@ async def start_transfer(req: TransferRequest, user_id: int = Depends(get_curren
                     await userbot.start_session(user_id, session.session_string)
 
         client = userbot.get_client(user_id)
+        
+        parsed_source = parse_target_chat(req.source_chat_id)
+        parsed_target = parse_target_chat(req.target_chat_id)
+        
         # Orqa fonda (background) ko'chirishni boshlash
         asyncio.create_task(run_transfer(
             user_id,
             client, 
-            req.source_chat_id, 
-            req.target_chat_id, 
+            parsed_source, 
+            parsed_target, 
             req.media_type
         ))
         return {'status': 'ok', 'message': "Tayyorlanmoqda..."}
