@@ -229,7 +229,7 @@ async def cmd_admin(message: Message) -> None:
     import os
 
     # Ruxsatni tekshirish (Faqat admin uchun)
-    if message.from_user.id != config.admin_id:
+    if message.from_user.id not in config.admin_ids:
         await message.answer("🚫 Sizda admin panelga kirish huquqi yo'q.")
         return
 

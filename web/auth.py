@@ -39,7 +39,7 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id_str: str = payload.get("sub")
         from config import config
-        if user_id_str is None or int(user_id_str) != config.admin_id:
+        if user_id_str is None or int(user_id_str) not in config.admin_ids:
             raise credentials_exception
         token_data = TokenData(username=user_id_str)
     except JWTError:
