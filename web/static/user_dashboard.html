@@ -510,7 +510,10 @@ createApp({
             phone: '', code: '', phoneHash: '', pass2fa: '',
             
             // Transfer
-            channels: [],
+            channels: (function() {
+                try { return JSON.parse(localStorage.getItem('cached_channels') || '[]'); }
+                catch(e) { return []; }
+            })(),
             loadingChannels: false,
             transferSource: '',
             transferTarget: '',
@@ -610,6 +613,9 @@ createApp({
                 });
                 if (res.ok) {
                     this.channels = await res.json();
+                    try {
+                        localStorage.setItem('cached_channels', JSON.stringify(this.channels));
+                    } catch(e) {}
                 } else if (showAlertOnError) {
                     let msg = "Kanallarni yuklashda xato!";
                     try {
@@ -726,6 +732,7 @@ createApp({
                     const d = await res.json();
                     this.token = d.access_token;
                     localStorage.setItem('jwt_token', this.token);
+                    this.loadChannels(false);
                 }
             } catch {}
         },
