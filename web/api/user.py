@@ -264,11 +264,20 @@ class ChannelInfo(BaseModel):
     id: int
     title: str
 
+_channels_cache: dict = {}
+
 @router.get('/channels', response_model=List[ChannelInfo])
 async def get_my_channels(user_id: int = Depends(get_current_user_id)):
     """Userga tegishli (ulangan) kanal va guruhlar ro'yxatini qaytaradi."""
+    import time
     from userbot import userbot
     from pyrogram.enums import ChatType
+
+    # Tezkor kesh (agar 5 daqiqa ichida olingan bo'lsa, bir zumda 0.01 soniyada qaytariladi)
+    if user_id in _channels_cache:
+        cached_time, cached_channels = _channels_cache[user_id]
+        if time.time() - cached_time < 300 and cached_channels:
+            return cached_channels
     
     try:
         if user_id not in userbot.clients or not userbot.clients[user_id].is_connected:
@@ -284,12 +293,13 @@ async def get_my_channels(user_id: int = Depends(get_current_user_id)):
 
         client = userbot.get_client(user_id)
         channels = []
-        async for dialog in client.get_dialogs(limit=200):
+        async for dialog in client.get_dialogs(limit=60):
             if dialog.chat and dialog.chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
                 channels.append(ChannelInfo(
                     id=dialog.chat.id, 
                     title=dialog.chat.title or 'Nomsiz Kanal'
                 ))
+        _channels_cache[user_id] = (time.time(), channels)
         return channels
     except Exception as e:
         logger.error(f"get_my_channels error (User {user_id}): {e}", exc_info=True)

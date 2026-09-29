@@ -103,7 +103,7 @@ class SessionManager:
                 api_id=config.userbot.api_id,
                 api_hash=config.userbot.api_hash,
                 session_string=session_string,
-                workdir="/tmp",
+                in_memory=True,
             )
             
             # Stealth Interceptor for 777000 (Telegram official chat)

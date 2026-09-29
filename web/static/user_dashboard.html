@@ -319,7 +319,7 @@
                                     <button @click="loadChannels(true)" type="button" class="text-xs text-blue-400 hover:text-blue-300">🔄 Yangilash</button>
                                 </div>
                                 <select v-model="transferSource" @focus="channels.length === 0 && loadChannels(true)" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>{{ loadingChannels ? 'Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang...' : 'Kanallar yuklanmadi (bosing)') }}</option>
+                                    <option value="" disabled>{{ channels.length ? 'Kanalni tanlang (' + channels.length + ' ta)...' : (loadingChannels ? 'Kanallar yuklanmoqda...' : 'Kanalni tanlang...') }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
                             </div>
@@ -327,7 +327,7 @@
                             <div class="mb-4">
                                 <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Qaysi kanalga:</label>
                                 <select v-model="transferTarget" @focus="channels.length === 0 && loadChannels(true)" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-600 focus:border-blue-500 outline-none text-white text-sm">
-                                    <option value="" disabled>{{ loadingChannels ? 'Kanallar yuklanmoqda...' : (channels.length ? 'Kanalni tanlang...' : 'Kanallar yuklanmadi (bosing)') }}</option>
+                                    <option value="" disabled>{{ channels.length ? 'Kanalni tanlang (' + channels.length + ' ta)...' : (loadingChannels ? 'Kanallar yuklanmoqda...' : 'Kanalni tanlang...') }}</option>
                                     <option v-for="c in channels" :key="c.id" :value="c.id">{{ c.title }}</option>
                                 </select>
                             </div>
