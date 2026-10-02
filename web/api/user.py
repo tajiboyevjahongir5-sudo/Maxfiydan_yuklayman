@@ -204,13 +204,22 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
         await bot.edit_message_text(text="📤 <b>Sizga yuborilmoqda...</b>", chat_id=user_id, message_id=progress_msg.message_id, parse_mode="HTML")
 
         from aiogram.types import FSInputFile
-        from utils import MediaType
+        from utils import MediaType, extract_mp4_metadata
 
         file = FSInputFile(downloaded_path)
         caption = "✅ Mana sizning faylingiz!"
 
         if media_type == MediaType.VIDEO:
-            await bot.send_video(user_id, file, caption=caption, supports_streaming=True)
+            v_w, v_h, v_dur = extract_mp4_metadata(downloaded_path)
+            await bot.send_video(
+                user_id, 
+                file, 
+                caption=caption, 
+                width=v_w or None,
+                height=v_h or None,
+                duration=v_dur or None,
+                supports_streaming=True
+            )
         elif media_type == MediaType.PHOTO:
             await bot.send_photo(user_id, file, caption=caption)
         elif media_type == MediaType.AUDIO:

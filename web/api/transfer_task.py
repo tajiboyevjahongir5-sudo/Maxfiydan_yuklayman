@@ -11,7 +11,7 @@ from pyrogram import Client
 from pyrogram.enums import MessageMediaType, MessagesFilter
 from pyrogram.errors import FloodWait
 from config import config
-from utils import parse_target_chat
+from utils import parse_target_chat, extract_mp4_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,8 @@ def get_media_info(msg):
         return "video_note", msg.video_note.file_unique_id, msg.video_note.file_size or 0, ".mp4", "📹 Dumaloq video"
     if msg.video:
         return "video", msg.video.file_unique_id, msg.video.file_size or 0, ".mp4", "🎥 Video"
+    if msg.animation:
+        return "animation", msg.animation.file_unique_id, msg.animation.file_size or 0, ".mp4", "🎞 Animatsiya"
     if msg.document:
         fn = msg.document.file_name or ""
         ext = os.path.splitext(fn)[1] or ".bin"
@@ -183,11 +185,11 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: Union[int, 
         if media_type == "photo":
             filters = [MessagesFilter.PHOTO]
         elif media_type == "video":
-            # Oddiy video + Dumaloq video (VIDEO_NOTE)
-            filters = [MessagesFilter.VIDEO, MessagesFilter.VIDEO_NOTE]
+            # Oddiy video + Dumaloq video (VIDEO_NOTE) + Animatsiya (ANIMATION)
+            filters = [MessagesFilter.VIDEO, MessagesFilter.VIDEO_NOTE, MessagesFilter.ANIMATION]
         else: # "all"
-            # Rasm, video + Dumaloq video (VIDEO_NOTE)
-            filters = [MessagesFilter.PHOTO_VIDEO, MessagesFilter.VIDEO_NOTE]
+            # Rasm, video + Dumaloq video + Animatsiya
+            filters = [MessagesFilter.PHOTO_VIDEO, MessagesFilter.VIDEO_NOTE, MessagesFilter.ANIMATION]
             
         transfer_states[user_id]["message"] = "Medialar aniqlanmoqda..."
         
@@ -223,7 +225,7 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: Union[int, 
                         continue
                     if media_type == "photo" and m_type == "photo":
                         messages_dict[message.id] = message
-                    elif media_type == "video" and m_type in ["video", "video_note"]:
+                    elif media_type == "video" and m_type in ["video", "video_note", "animation"]:
                         messages_dict[message.id] = message
                     elif media_type == "all":
                         messages_dict[message.id] = message
@@ -425,11 +427,15 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: Union[int, 
                             success_count += 1
                         except Exception as vn_err:
                             logger.warning(f"send_video_note xatosi ({vn_err}), oddiy video sifatida yuborilmoqda...")
+                            v_w, v_h, v_dur = extract_mp4_metadata(file_path)
                             await asyncio.wait_for(
                                 client.send_video(
                                     target_chat_id, 
                                     video=file_path, 
-                                    caption=message.caption, 
+                                    caption=message.caption,
+                                    width=v_w or 0,
+                                    height=v_h or 0,
+                                    duration=v_dur or duration,
                                     progress=make_progress("video sifatida yuborilmoqda")
                                 ),
                                 timeout=send_timeout
@@ -437,24 +443,88 @@ async def run_transfer(user_id: int, client: Client, source_chat_id: Union[int, 
                             success_count += 1
 
                     elif m_type == "video":
+                        v_width = getattr(message.video, "width", 0) or 0
+                        v_height = getattr(message.video, "height", 0) or 0
+                        v_duration = getattr(message.video, "duration", 0) or 0
+                        v_supports_streaming = getattr(message.video, "supports_streaming", True)
+                        v_file_name = getattr(message.video, "file_name", None)
+
+                        # Agar kenglik yoki balandlik 0 bo'lsa, MP4 fayl sarlavhasidan aniqlaymiz
+                        if v_width == 0 or v_height == 0:
+                            f_w, f_h, f_dur = extract_mp4_metadata(file_path)
+                            if f_w > 0 and f_h > 0:
+                                v_width, v_height = f_w, f_h
+                            if v_duration == 0 and f_dur > 0:
+                                v_duration = f_dur
+
                         await asyncio.wait_for(
                             client.send_video(
                                 target_chat_id, 
                                 video=file_path, 
-                                caption=message.caption, 
-                                progress=make_progress("yuborilmoqda")
+                                caption=message.caption,
+                                width=v_width,
+                                height=v_height,
+                                duration=v_duration,
+                                supports_streaming=v_supports_streaming,
+                                file_name=v_file_name,
+                                progress=make_progress("video yuborilmoqda")
+                            ),
+                            timeout=send_timeout
+                        )
+                        success_count += 1
+
+                    elif m_type == "animation":
+                        a_width = getattr(message.animation, "width", 0) or 0
+                        a_height = getattr(message.animation, "height", 0) or 0
+                        a_duration = getattr(message.animation, "duration", 0) or 0
+                        if a_width == 0 or a_height == 0:
+                            f_w, f_h, f_dur = extract_mp4_metadata(file_path)
+                            if f_w > 0 and f_h > 0:
+                                a_width, a_height = f_w, f_h
+                            if a_duration == 0 and f_dur > 0:
+                                a_duration = f_dur
+
+                        await asyncio.wait_for(
+                            client.send_animation(
+                                target_chat_id,
+                                animation=file_path,
+                                caption=message.caption,
+                                width=a_width,
+                                height=a_height,
+                                duration=a_duration,
+                                progress=make_progress("animatsiya yuborilmoqda")
+                            ),
+                            timeout=send_timeout
+                        )
+                        success_count += 1
+
+                    elif m_type == "audio":
+                        a_duration = getattr(message.audio, "duration", 0) or 0
+                        a_performer = getattr(message.audio, "performer", None)
+                        a_title = getattr(message.audio, "title", None)
+                        await asyncio.wait_for(
+                            client.send_audio(
+                                target_chat_id,
+                                audio=file_path,
+                                caption=message.caption,
+                                duration=a_duration,
+                                performer=a_performer,
+                                title=a_title,
+                                progress=make_progress("audio yuborilmoqda")
                             ),
                             timeout=send_timeout
                         )
                         success_count += 1
 
                     else:
+                        d_file_name = getattr(message.document, "file_name", None) if message.document else None
                         await asyncio.wait_for(
                             client.send_document(
                                 target_chat_id, 
                                 document=file_path, 
-                                caption=message.caption, 
-                                progress=make_progress("yuborilmoqda")
+                                caption=message.caption,
+                                file_name=d_file_name,
+                                progress=make_progress("hujjat yuborilmoqda")
                             ),
                             timeout=send_timeout
                         )

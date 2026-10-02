@@ -492,9 +492,14 @@ async def _send_file_to_user(message: Message, file_path: Path, media_type=None)
             caption="✅ Mana sizning rasmingiz!",
         )
     elif media_type == MediaType.VIDEO:
+        from utils import extract_mp4_metadata
+        v_w, v_h, v_dur = extract_mp4_metadata(file_path)
         await message.answer_video(
             video=input_file,
             caption="✅ Mana sizning videongiz!",
+            width=v_w or None,
+            height=v_h or None,
+            duration=v_dur or None,
             supports_streaming=True,
         )
     elif media_type == MediaType.AUDIO:
@@ -512,7 +517,16 @@ async def _send_file_to_user(message: Message, file_path: Path, media_type=None)
         if suffix in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
             await message.answer_photo(photo=input_file, caption="✅ Mana sizning rasmingiz!")
         elif suffix in {".mp4", ".mov", ".avi", ".mkv", ".webm"}:
-            await message.answer_video(video=input_file, caption="✅ Mana sizning videongiz!", supports_streaming=True)
+            from utils import extract_mp4_metadata
+            v_w, v_h, v_dur = extract_mp4_metadata(file_path)
+            await message.answer_video(
+                video=input_file, 
+                caption="✅ Mana sizning videongiz!", 
+                width=v_w or None,
+                height=v_h or None,
+                duration=v_dur or None,
+                supports_streaming=True
+            )
         elif suffix in {".mp3", ".flac", ".ogg", ".aac", ".wav", ".m4a"}:
             await message.answer_audio(audio=input_file, caption="✅ Mana sizning audiongiz!")
         elif suffix == ".oga":
@@ -539,7 +553,16 @@ async def _send_media_group_to_user(message: Message, files: list[tuple[Path, st
         if m_type == MediaType.PHOTO:
             media_group.append(InputMediaPhoto(media=input_file, caption=caption))
         elif m_type == MediaType.VIDEO:
-            media_group.append(InputMediaVideo(media=input_file, caption=caption, supports_streaming=True))
+            from utils import extract_mp4_metadata
+            v_w, v_h, v_dur = extract_mp4_metadata(file_path)
+            media_group.append(InputMediaVideo(
+                media=input_file, 
+                caption=caption, 
+                width=v_w or None,
+                height=v_h or None,
+                duration=v_dur or None,
+                supports_streaming=True
+            ))
         else:
             # Agar hujjat yoki boshqa bo'lsa, media guruhda ba'zida faqat photo/video ruxsat etiladi.
             # Lekin Document ham albom bo'lishi mumkin. Kengaytmadan tekshiramiz.
@@ -547,7 +570,16 @@ async def _send_media_group_to_user(message: Message, files: list[tuple[Path, st
             if suffix in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
                 media_group.append(InputMediaPhoto(media=input_file, caption=caption))
             elif suffix in {".mp4", ".mov", ".avi", ".mkv", ".webm"}:
-                media_group.append(InputMediaVideo(media=input_file, caption=caption, supports_streaming=True))
+                from utils import extract_mp4_metadata
+                v_w, v_h, v_dur = extract_mp4_metadata(file_path)
+                media_group.append(InputMediaVideo(
+                    media=input_file, 
+                    caption=caption, 
+                    width=v_w or None,
+                    height=v_h or None,
+                    duration=v_dur or None,
+                    supports_streaming=True
+                ))
             else:
                 media_group.append(InputMediaDocument(media=input_file, caption=caption))
                 

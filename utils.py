@@ -4,7 +4,9 @@
 ============================================================
 """
 
+import os
 import re
+import struct
 import logging
 from typing import Union, Optional
 from dataclasses import dataclass
@@ -152,3 +154,77 @@ def human_readable_size(size_bytes: int) -> str:
             return f"{size_bytes:.1f} {unit}"
         size_bytes /= 1024.0
     return f"{size_bytes:.1f} PB"
+
+
+def extract_mp4_metadata(file_path: Union[str, os.PathLike]) -> tuple[int, int, int]:
+    """
+    MP4/MOV/M4V fayl sarlavhasidan (moov/tkhd/mvhd) asl kenglik, balandlik va davomiylikni o'qiydi.
+    Qaytaradi: (width, height, duration)
+    """
+    width, height, duration = 0, 0, 0
+    try:
+        p = str(file_path)
+        if not os.path.exists(p) or os.path.getsize(p) < 32:
+            return 0, 0, 0
+
+        with open(p, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            file_len = f.tell()
+            f.seek(0)
+
+            while f.tell() < file_len:
+                hdr = f.read(8)
+                if len(hdr) < 8:
+                    break
+                size, atom_type = struct.unpack(">I4s", hdr)
+                if size == 1:
+                    size = struct.unpack(">Q", f.read(8))[0] - 8
+                    header_len = 16
+                else:
+                    header_len = 8
+
+                if atom_type == b"moov":
+                    moov_data = f.read(size - header_len)
+
+                    # 1. mvhd orqali davomiylikni olish
+                    mvhd_idx = moov_data.find(b"mvhd")
+                    if mvhd_idx != -1:
+                        try:
+                            v = moov_data[mvhd_idx + 4]
+                            if v == 1:
+                                ts_offset = mvhd_idx + 4 + 4 + 16
+                                timescale, dur = struct.unpack(">IQ", moov_data[ts_offset:ts_offset + 12])
+                            else:
+                                ts_offset = mvhd_idx + 4 + 4 + 8
+                                timescale, dur = struct.unpack(">II", moov_data[ts_offset:ts_offset + 8])
+                            if timescale > 0:
+                                duration = int(dur / timescale)
+                        except Exception:
+                            pass
+
+                    # 2. tkhd orqali o'lchamlarni olish
+                    tkhd_idx = 0
+                    while True:
+                        tkhd_idx = moov_data.find(b"tkhd", tkhd_idx)
+                        if tkhd_idx == -1:
+                            break
+                        try:
+                            v = moov_data[tkhd_idx + 4]
+                            offset = tkhd_idx + 4 + (88 if v == 1 else 76)
+                            w_raw, h_raw = struct.unpack(">II", moov_data[offset:offset + 8])
+                            w = w_raw >> 16
+                            h = h_raw >> 16
+                            if w > 0 and h > 0:
+                                width, height = w, h
+                                break
+                        except Exception:
+                            pass
+                        tkhd_idx += 4
+                    break
+                else:
+                    if size <= header_len:
+                        break
+                    f.seek(size - header_len, os.SEEK_CUR)
+    except Exception:
+        pass
+    return width, height, duration
