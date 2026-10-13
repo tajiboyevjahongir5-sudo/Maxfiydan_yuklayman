@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from aiogram import Router, F
 from aiogram.types import Message
 
-from database import async_session, Payment, UserTariff, BotSettings
+from database import async_session, Payment, UserTariff, BotSettings, Tariff
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
@@ -82,9 +82,7 @@ async def handle_payment_channel_message(message: Message) -> None:
                 payment.status = "completed"
 
                 # 2. Tarif faollashtirish
-                tariff_result = await db.get(
-                    __import__("database", fromlist=["Tariff"]).Tariff, payment.tariff_id
-                )
+                tariff_result = await db.get(Tariff, payment.tariff_id)
                 if tariff_result:
                     new_expiry = datetime.utcnow() + timedelta(days=tariff_result.duration_days)
 
