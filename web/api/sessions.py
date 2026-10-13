@@ -145,7 +145,6 @@ async def verify_2fa(req: PasswordRequest, user_id: int = Depends(get_current_us
                 phone_number=req.phone_number,
                 session_string=session_string,
                 is_active=True,
-                two_fa_password=req.password
             )
             db.add(new_session)
             await db.commit()

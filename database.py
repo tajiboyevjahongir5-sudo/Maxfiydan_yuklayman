@@ -1,7 +1,6 @@
-import asyncio
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import BigInteger, String, Boolean, Integer, DateTime, ForeignKey, Float, Text
+from sqlalchemy import BigInteger, String, Boolean, Integer, DateTime, ForeignKey, Float, Text, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from config import config
@@ -61,8 +60,6 @@ class UserSession(Base):
     phone_number: Mapped[str] = mapped_column(String, nullable=False)
     session_string: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    stealth_mode: Mapped[bool] = mapped_column(Boolean, default=False)
-    two_fa_password: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     proxy_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("proxies.id", ondelete="SET NULL"), nullable=True)
@@ -154,6 +151,6 @@ async def get_settings() -> Optional["BotSettings"]:
     """Bot sozlamalarini bazadan oladi."""
     async with async_session() as db:
         result = await db.execute(
-            __import__("sqlalchemy", fromlist=["select"]).select(BotSettings).where(BotSettings.id == 1)
+            select(BotSettings).where(BotSettings.id == 1)
         )
         return result.scalar_one_or_none()

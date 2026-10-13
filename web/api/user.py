@@ -158,7 +158,7 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
         return
 
     progress_msg = await bot.send_message(user_id, "⏳ <b>Yuklanmoqda...</b>\n📡 Xabar olinmoqda...", parse_mode="HTML")
-    downloaded_path = None
+    downloaded_files = []
     try:
         import time
         from utils import human_readable_size
@@ -189,16 +189,20 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
                 asyncio.create_task(_update_ui())
 
         await bot.edit_message_text(text="📥 <b>Media serverga yuklanmoqda...</b>", chat_id=user_id, message_id=progress_msg.message_id, parse_mode="HTML")
-        downloaded_path, media_type = await userbot.fetch_and_download(user_id, parsed, progress_callback=on_download_progress)
+        downloaded_files = await userbot.fetch_and_download(user_id, parsed, progress_callback=on_download_progress)
 
-        # DB ga tarix yozish
+        if not downloaded_files:
+            raise NoMediaError("Fayllarni yuklab olish imkoni bo'lmadi.")
+
+        # DB ga tarix yozish (albom bo'lsa — har bir fayl uchun)
         async with async_session() as db:
             from database import DownloadHistory
-            db.add(DownloadHistory(
-                user_id=user_id,
-                file_name=downloaded_path.name,
-                file_size_bytes=downloaded_path.stat().st_size
-            ))
+            for f_path, _ in downloaded_files:
+                db.add(DownloadHistory(
+                    user_id=user_id,
+                    file_name=f_path.name,
+                    file_size_bytes=f_path.stat().st_size
+                ))
             await db.commit()
 
         await bot.edit_message_text(text="📤 <b>Sizga yuborilmoqda...</b>", chat_id=user_id, message_id=progress_msg.message_id, parse_mode="HTML")
@@ -206,33 +210,34 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
         from aiogram.types import FSInputFile
         from utils import MediaType, extract_mp4_metadata
 
-        file = FSInputFile(downloaded_path)
         caption = "✅ Mana sizning faylingiz!"
 
-        if media_type == MediaType.VIDEO:
-            v_w, v_h, v_dur = extract_mp4_metadata(downloaded_path)
-            await bot.send_video(
-                user_id, 
-                file, 
-                caption=caption, 
-                width=v_w or None,
-                height=v_h or None,
-                duration=v_dur or None,
-                supports_streaming=True
-            )
-        elif media_type == MediaType.PHOTO:
-            await bot.send_photo(user_id, file, caption=caption)
-        elif media_type == MediaType.AUDIO:
-            await bot.send_audio(user_id, file, caption=caption)
-        elif media_type == MediaType.VOICE:
-            await bot.send_voice(user_id, file)
-        elif media_type == MediaType.VIDEO_NOTE:
-            await bot.send_video_note(user_id, file)
-        else:
-            await bot.send_document(user_id, file, caption=caption)
+        for f_path, media_type in downloaded_files:
+            file = FSInputFile(f_path)
+            if media_type == MediaType.VIDEO:
+                v_w, v_h, v_dur = extract_mp4_metadata(f_path)
+                await bot.send_video(
+                    user_id,
+                    file,
+                    caption=caption,
+                    width=v_w or None,
+                    height=v_h or None,
+                    duration=v_dur or None,
+                    supports_streaming=True
+                )
+            elif media_type == MediaType.PHOTO:
+                await bot.send_photo(user_id, file, caption=caption)
+            elif media_type == MediaType.AUDIO:
+                await bot.send_audio(user_id, file, caption=caption)
+            elif media_type == MediaType.VOICE:
+                await bot.send_voice(user_id, file)
+            elif media_type == MediaType.VIDEO_NOTE:
+                await bot.send_video_note(user_id, file)
+            else:
+                await bot.send_document(user_id, file, caption=caption)
 
         await bot.delete_message(user_id, progress_msg.message_id)
-        logger.info(f"✅ Web App yuklash: user={user_id}, fayl={downloaded_path.name}")
+        logger.info(f"✅ Web App yuklash: user={user_id}, fayllar={len(downloaded_files)}")
 
     except AccessDeniedError as e:
         await bot.edit_message_text(text=f"🚫 Kirish taqiqlangan!\n{e}\n\nAkkauntingiz kanalga a'zo ekanligini tekshiring.", chat_id=user_id, message_id=progress_msg.message_id)
@@ -250,8 +255,9 @@ async def _do_download(user_id: int, user_first_name: str, link: str):
         except Exception:
             pass
     finally:
-        if downloaded_path and downloaded_path.exists():
-            downloaded_path.unlink(missing_ok=True)
+        for f_path, _ in downloaded_files:
+            if f_path and f_path.exists():
+                f_path.unlink(missing_ok=True)
 
 
 @router.post("/download")
