@@ -936,7 +936,7 @@ createApp({
                 if (res.ok) {
                     this.phoneHash = d.phone_code_hash;
                     this.authStep = 'code';
-                } else { this.tg?.showAlert(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail) || "Xato"); }
+                } else { this.safeAlert(typeof d.detail === 'string' ? d.detail : (JSON.stringify(d.detail) || "Xato")); }
             } finally { this.loading = false; }
         },
         async verifyCode() {
@@ -956,11 +956,11 @@ createApp({
                     this.loadChannels(false);
                 } else if (d.status === '2fa_required') {
                     this.authStep = 'password';
-                } else { this.tg?.showAlert(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail) || "Xato"); }
+                } else { this.safeAlert(typeof d.detail === 'string' ? d.detail : (JSON.stringify(d.detail) || "Xato")); }
             } finally { this.loading = false; }
         },
         async verifyPassword() {
-            if (!this.pass2fa) return this.tg?.showAlert("Parolni kiriting");
+            if (!this.pass2fa) return this.safeAlert("Parolni kiriting");
             this.loading = true;
             try {
                 const res = await fetch('/api/sessions/verify_2fa', {
@@ -978,10 +978,10 @@ createApp({
                     let errMsg = "Xato yuz berdi";
                     if (d.detail) errMsg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
                     else if (d.message) errMsg = d.message;
-                    this.tg?.showAlert("❌ " + errMsg);
+                    this.safeAlert("❌ " + errMsg);
                 }
             } catch (err) {
-                this.tg?.showAlert("🌐 Ulanishda xatolik: " + err.message);
+                this.safeAlert("🌐 Ulanishda xatolik: " + (err && err.message ? err.message : err));
             } finally { this.loading = false; }
         },
         logout() {
@@ -997,6 +997,17 @@ createApp({
         },
 
         // ── Yordamchi ───────────────────────────────────────────
+        safeAlert(msg) {
+            // Telegram showAlert matni 256 belgidan oshsa yoki bo'sh bo'lsa
+            // "WebAppPopupParamInvalid" otadi — shuning uchun qisqartiramiz va
+            // har qanday holatda ham oddiy alert'ga qaytamiz.
+            let text = (msg == null ? '' : String(msg)).trim() || 'Xatolik yuz berdi';
+            if (text.length > 200) text = text.slice(0, 197) + '…';
+            try {
+                if (this.tg && this.tg.showAlert) { this.tg.showAlert(text); return; }
+            } catch (e) { /* pastdagi oddiy alert'ga o'tamiz */ }
+            try { alert(text); } catch (e) {}
+        },
         fileIcon(name) {
             if (!name) return '📄';
             const ext = name.split('.').pop().toLowerCase();
