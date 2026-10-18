@@ -147,6 +147,27 @@ async def init_db():
     except Exception:
         pass
 
+    # ── Migratsiya: eski "account-takeover" ustunlarini tushirish ──────────────
+    # Eski sxemada user_sessions jadvalida stealth_mode (NOT NULL) va
+    # two_fa_password ustunlari bor edi. Model'dan olib tashlanganidan keyin
+    # yangi INSERT bu ustunlarni bermaydi → eski bazada NOT NULL xatosi chiqadi.
+    # Shu sabab ularni mavjud bazadan ham olib tashlaymiz.
+    is_sqlite = engine.dialect.name == "sqlite"
+    for col in ("stealth_mode", "two_fa_password"):
+        # Postgres: IF EXISTS qo'llab-quvvatlanadi. SQLite (3.35+): IF EXISTS yo'q.
+        stmt = (
+            f"ALTER TABLE user_sessions DROP COLUMN {col}"
+            if is_sqlite
+            else f"ALTER TABLE user_sessions DROP COLUMN IF EXISTS {col}"
+        )
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(stmt))
+        except Exception:
+            # Ustun allaqachon yo'q yoki eski SQLite DROP COLUMN'ni qo'llamaydi —
+            # ikkala holatda ham davom etamiz.
+            pass
+
 async def get_settings() -> Optional["BotSettings"]:
     """Bot sozlamalarini bazadan oladi."""
     async with async_session() as db:
